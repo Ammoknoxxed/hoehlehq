@@ -1,7 +1,8 @@
 import { getServerSession } from "next-auth";
-import { authOptions } from "./api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth"; // Import anpassen!
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+// ... restlicher Code bleibt gleich
 
 // Dies ist eine Server Component. Sie lädt Daten sicher im Backend, bevor der Nutzer etwas sieht.
 export default async function Dashboard() {

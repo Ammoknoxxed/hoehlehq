@@ -1,0 +1,51 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // Diese URL wird später in Railway über die Environment Variables gefüttert
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String       @id @default(cuid())
+  name          String
+  email         String       @unique
+  password      String       // Gehasht, niemals im Klartext!
+  netIncome     Float        @default(0) // Monatliches Nettoeinkommen
+  items         BucketItem[] @relation("CreatedItems")
+  approvedItems BucketItem[] @relation("ApprovedItems")
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model BucketItem {
+  id          String   @id @default(cuid())
+  title       String
+  price       Float
+  
+  // Wer hat es erstellt?
+  creatorId   String
+  creator     User     @relation("CreatedItems", fields: [creatorId], references: [id])
+  
+  // Hat der andere zugestimmt? (Daumen hoch System)
+  approverId  String?
+  approver    User?    @relation("ApprovedItems", fields: [approverId], references: [id])
+  
+  isPurchased Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model FinancialObligation {
+  id          String   @id @default(cuid())
+  title       String
+  amount      Float
+  type        String   // z.B. "SCHULDEN_RATE", "FIXKOSTEN", "GEMEINSAME_AUSGABE"
+  isShared    Boolean  @default(true) // Tragen es beide oder nur einer?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

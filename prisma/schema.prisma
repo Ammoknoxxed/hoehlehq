@@ -6,8 +6,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  // Diese URL wird später in Railway über die Environment Variables gefüttert
-  url      = env("DATABASE_URL")
 }
 
 model User {

@@ -12,10 +12,14 @@ model User {
   id            String       @id @default(cuid())
   name          String
   email         String       @unique
-  password      String       // Gehasht, niemals im Klartext!
-  netIncome     Float        @default(0) // Monatliches Nettoeinkommen
+  password      String       
+  netIncome     Float        @default(0) 
+  
+  // Relationen
   items         BucketItem[] @relation("CreatedItems")
   approvedItems BucketItem[] @relation("ApprovedItems")
+  expenses      Expense[]    @relation("UserExpenses") // NEU: Für variable Ausgaben
+  
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 }
@@ -24,6 +28,11 @@ model BucketItem {
   id          String   @id @default(cuid())
   title       String
   price       Float
+  
+  // NEU: Modul 2 - Our Journeys 2.0
+  savedAmount Float    @default(0)     // Sinking Fund: Wie viel wurde schon angespart?
+  isSurprise  Boolean  @default(false) // Blind Proposal: Ist es eine Überraschung?
+  isCompleted Boolean  @default(false) // Memory Archive: Ist der Traum erfüllt?
   
   // Wer hat es erstellt?
   creatorId   String
@@ -46,4 +55,16 @@ model FinancialObligation {
   isShared    Boolean  @default(true) // Tragen es beide oder nur einer?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// NEU: Modul 1 - Variable Ausgaben (Der Daily Sync)
+model Expense {
+  id          String   @id @default(cuid())
+  title       String   // z.B. "Rewe", "Tanken"
+  amount      Float
+  date        DateTime @default(now())
+  
+  // Wer hat es bezahlt?
+  userId      String
+  user        User     @relation("UserExpenses", fields: [userId], references: [id])
 }

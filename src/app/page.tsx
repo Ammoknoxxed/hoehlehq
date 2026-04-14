@@ -21,7 +21,9 @@ export default async function Dashboard() {
   
   const obligations = await prisma.financialObligation.findMany();
   
-  // Ausgaben des aktuellen Monats
+  // Zählen, wie viele Artikel auf der Einkaufsliste fehlen
+  const openShoppingItemsCount = await prisma.shoppingItem.count({ where: { checked: false } });
+  
   const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   const expenses = await prisma.expense.findMany({
     where: { date: { gte: startOfMonth } },
@@ -39,23 +41,21 @@ export default async function Dashboard() {
   const partnerIncome = partner?.netIncome || 0;
   const totalIncome = myIncome + partnerIncome;
   
-  const totalExpenses = obligations.reduce((sum: number, ob: any) => sum + ob.amount, 0);
-  const totalVariable = expenses.reduce((sum: number, ex: any) => sum + ex.amount, 0);
+  const totalExpenses = obligations.reduce((sum, ob) => sum + ob.amount, 0);
+  const totalVariable = expenses.reduce((sum, ex) => sum + ex.amount, 0);
   const freeCashflow = totalIncome - totalExpenses - totalVariable;
 
-  // Prozentualer Anteil am Haushalt (Sicherheit vor Division durch 0)
   const mySharePct = totalIncome > 0 ? (myIncome / totalIncome) : 0.5;
-  const partnerSharePct = totalIncome > 0 ? (partnerIncome / totalIncome) : 0.5;
+  const partnerSharePct = 1 - mySharePct;
 
   const myFairCost = totalExpenses * mySharePct;
   const partnerFairCost = totalExpenses * partnerSharePct;
 
-  // --- FILTER ---
-  // isCompleted = false (Archivierte Träume werden ausgeblendet)
+  // --- BUCKETLIST FILTER ---
   const activeItems = allItems.filter(i => !i.isCompleted);
   const jointItems = activeItems.filter(i => i.approverId !== null);
-  const partnerProposals = activeItems.filter(i => i.creatorId !== currentUser?.id && i.approverId === null);
-  const myProposals = activeItems.filter(i => i.creatorId === currentUser?.id && i.approverId === null);
+  const myIndividualItems = activeItems.filter(i => i.creatorId === currentUser?.id && i.approverId === null);
+  const partnerIndividualItems = activeItems.filter(i => i.creatorId === partner?.id && i.approverId === null);
 
   return (
     <div className="min-h-screen bg-[#F9F7F5] dark:bg-stone-950 text-stone-900 dark:text-stone-100 p-4 md:p-8 pb-32 transition-colors duration-300">
@@ -92,188 +92,255 @@ export default async function Dashboard() {
           </div>
         </header>
 
-        {/* MODUL 1: FAIR SHARE & VARIABLE AUSGABEN */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* QUICK APPS & NAVIGATION */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <Link href="/shopping" className="bg-stone-800 dark:bg-stone-900 text-white p-5 rounded-3xl shadow-lg hover:bg-stone-700 dark:hover:bg-stone-800 transition-all flex flex-col justify-between group h-32">
+            <div className="flex justify-between items-start">
+              <h2 className="text-sm font-bold">Shopping</h2>
+              <span className="text-xl group-hover:scale-110 transition-transform">🛒</span>
+            </div>
+            <p className="text-xs text-stone-400">{openShoppingItemsCount} offene Artikel</p>
+          </Link>
           
-          {/* Fair Share Dashboard */}
-          <section className="col-span-1 md:col-span-2 bg-white dark:bg-stone-900 p-6 rounded-3xl shadow-sm border border-stone-100 dark:border-stone-800">
-            <h2 className="text-sm font-bold text-stone-400 uppercase mb-6 flex justify-between">
-              <span>Haushalts-Aufteilung</span>
-              <span className="text-stone-500">Fixkosten: € {totalExpenses}</span>
-            </h2>
-            
-            <div className="space-y-6">
-              {/* Du */}
-              <div>
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="font-bold">{currentUser?.name}</span>
-                  <span className="text-stone-500">Trägt {(mySharePct * 100).toFixed(0)}% (Fair: € {myFairCost.toFixed(0)})</span>
+          <Link href="/mealprep" className="bg-[#C5A38E] text-white p-5 rounded-3xl shadow-lg hover:bg-[#A38572] transition-all flex flex-col justify-between group h-32">
+            <div className="flex justify-between items-start">
+              <h2 className="text-sm font-bold">Meal Prep</h2>
+              <span className="text-xl group-hover:scale-110 transition-transform">🍳</span>
+            </div>
+            <p className="text-xs text-white/80">Wochenplaner</p>
+          </Link>
+
+          <Link href="/chores" className="bg-stone-800 dark:bg-stone-900 text-white p-5 rounded-3xl shadow-lg hover:bg-stone-700 dark:hover:bg-stone-800 transition-all flex flex-col justify-between group h-32">
+            <div className="flex justify-between items-start">
+              <h2 className="text-sm font-bold">Putzplan</h2>
+              <span className="text-xl group-hover:scale-110 transition-transform">✨</span>
+            </div>
+            <p className="text-xs text-stone-400">Karma Tracker</p>
+          </Link>
+
+          <Link href="/roulette" className="bg-white dark:bg-stone-900 text-stone-900 dark:text-white border border-stone-200 dark:border-stone-800 p-5 rounded-3xl shadow-sm hover:border-[#C5A38E] transition-all flex flex-col justify-between group h-32">
+            <div className="flex justify-between items-start">
+              <h2 className="text-sm font-bold">Date Night</h2>
+              <span className="text-xl group-hover:scale-110 transition-transform">🎲</span>
+            </div>
+            <p className="text-xs text-stone-500">Ideen-Roulette</p>
+          </Link>
+
+          <Link href="/vault" className="bg-stone-200 dark:bg-stone-800 text-stone-700 dark:text-stone-300 p-5 rounded-3xl shadow-sm hover:bg-stone-300 dark:hover:bg-stone-700 transition-all flex flex-col justify-between group h-32">
+            <div className="flex justify-between items-start">
+              <h2 className="text-sm font-bold">Tresor</h2>
+              <span className="text-xl group-hover:scale-110 transition-transform">🔒</span>
+            </div>
+            <p className="text-xs text-stone-500 opacity-80">Dokumente</p>
+          </Link>
+        </div>
+
+        {/* FINANZEN & FAIR SHARE */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          
+          <section className="bg-white dark:bg-stone-900 p-6 rounded-3xl shadow-sm border border-stone-100 dark:border-stone-800 space-y-6">
+            <div>
+              <h2 className="text-sm font-bold text-stone-400 uppercase mb-4">Dein Netto-Einkommen</h2>
+              <form action={async (formData) => { "use server"; await updateNetIncome(parseFloat(formData.get("income") as string)); }} className="flex gap-2">
+                <input name="income" type="number" step="0.01" placeholder={currentUser?.netIncome.toString()} className="flex-1 px-4 py-2 bg-stone-50 dark:bg-stone-950 dark:text-stone-200 rounded-xl outline-none border border-stone-100 dark:border-stone-800" />
+                <button className="bg-stone-800 dark:bg-stone-700 text-white px-4 py-2 font-bold rounded-xl text-sm">Update</button>
+              </form>
+            </div>
+
+            <div className="pt-4 border-t border-stone-100 dark:border-stone-800">
+              <h2 className="text-sm font-bold text-stone-400 uppercase mb-4 flex justify-between">
+                <span>Fair Share Verteilung</span>
+                <span className="text-[#C5A38E]">Total Fixkosten: € {totalExpenses}</span>
+              </h2>
+              <div className="space-y-4">
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="font-bold">{currentUser?.name}</span>
+                    <span className="text-stone-500">{(mySharePct * 100).toFixed(0)}% (Soll: € {myFairCost.toFixed(0)})</span>
+                  </div>
+                  <div className="h-2 w-full bg-stone-100 dark:bg-stone-800 rounded-full flex"><div className="bg-stone-700 h-full" style={{ width: `${mySharePct * 100}%` }}></div></div>
                 </div>
-                <div className="h-2 w-full bg-stone-100 dark:bg-stone-800 rounded-full overflow-hidden flex">
-                  <div className="bg-stone-700 h-full" style={{ width: `${mySharePct * 100}%` }}></div>
-                </div>
-              </div>
-              
-              {/* Partner */}
-              <div>
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="font-bold">{partner?.name || 'Partner'}</span>
-                  <span className="text-stone-500">Trägt {(partnerSharePct * 100).toFixed(0)}% (Fair: € {partnerFairCost.toFixed(0)})</span>
-                </div>
-                <div className="h-2 w-full bg-stone-100 dark:bg-stone-800 rounded-full overflow-hidden flex">
-                  <div className="bg-[#C5A38E] h-full" style={{ width: `${partnerSharePct * 100}%` }}></div>
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="font-bold">{partner?.name || 'Partner'}</span>
+                    <span className="text-stone-500">{(partnerSharePct * 100).toFixed(0)}% (Soll: € {partnerFairCost.toFixed(0)})</span>
+                  </div>
+                  <div className="h-2 w-full bg-stone-100 dark:bg-stone-800 rounded-full flex"><div className="bg-[#C5A38E] h-full" style={{ width: `${partnerSharePct * 100}%` }}></div></div>
                 </div>
               </div>
             </div>
           </section>
 
-          {/* Daily Sync: Variable Ausgaben */}
-          <section className="col-span-1 bg-white dark:bg-stone-900 p-6 rounded-3xl shadow-sm border border-stone-100 dark:border-stone-800 flex flex-col h-full">
-            <h2 className="text-sm font-bold text-stone-400 uppercase mb-4">Kassenbons (Dieser Monat)</h2>
-            <div className="flex-1 space-y-3 overflow-y-auto max-h-32 mb-4 pr-2">
-              {expenses.map(ex => (
-                <div key={ex.id} className="flex justify-between items-center text-sm border-b border-stone-50 dark:border-stone-800 pb-2">
-                  <div className="flex flex-col">
-                    <span className="font-medium text-stone-700 dark:text-stone-300">{ex.title}</span>
-                    <span className="text-[10px] text-stone-400">{ex.user.name}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-[#C5A38E]">-€ {ex.amount}</span>
-                    <form action={async () => { "use server"; await deleteExpense(ex.id); }}>
-                      <button className="text-stone-300 dark:text-stone-600 hover:text-red-400 transition">✕</button>
+          <section className="bg-white dark:bg-stone-900 p-6 rounded-3xl shadow-sm border border-stone-100 dark:border-stone-800 flex flex-col">
+            <h2 className="text-sm font-bold text-stone-400 uppercase mb-4">Fixkosten Eingabe</h2>
+            <div className="flex-1 space-y-3 overflow-y-auto max-h-40 mb-4 pr-2">
+              {obligations.map(ob => (
+                <div key={ob.id} className="flex justify-between items-center text-sm border-b border-stone-50 dark:border-stone-800 pb-2">
+                  <span className="text-stone-600 dark:text-stone-300">{ob.title}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="font-bold">€ {ob.amount}</span>
+                    <form action={async () => { "use server"; await deleteObligation(ob.id); }}>
+                      <button className="text-stone-300 hover:text-red-400">✕</button>
                     </form>
                   </div>
                 </div>
               ))}
             </div>
-            <form action={async (formData) => { "use server"; await addExpense(formData.get("title") as string, parseFloat(formData.get("amount") as string)); }} className="flex gap-2 mt-auto">
-              <input name="title" placeholder="Supermarkt" className="flex-1 text-xs p-3 bg-stone-50 dark:bg-stone-950 dark:text-stone-200 rounded-xl outline-none border border-stone-200 dark:border-stone-800" required />
-              <input name="amount" type="number" step="0.01" placeholder="€" className="w-16 text-xs p-3 bg-stone-50 dark:bg-stone-950 dark:text-stone-200 rounded-xl outline-none border border-stone-200 dark:border-stone-800" required />
-              <button className="p-3 bg-stone-800 dark:bg-stone-700 text-white rounded-xl text-xs font-bold">+</button>
+            <form action={async (formData) => { "use server"; await addObligation(formData.get("title") as string, parseFloat(formData.get("amount") as string)); }} className="flex gap-2 mt-auto">
+              <input name="title" placeholder="Miete, Strom..." className="flex-1 text-sm p-3 bg-stone-50 dark:bg-stone-950 dark:text-stone-200 rounded-xl outline-none" required />
+              <input name="amount" type="number" placeholder="€" className="w-20 text-sm p-3 bg-stone-50 dark:bg-stone-950 dark:text-stone-200 rounded-xl outline-none" required />
+              <button className="p-3 bg-[#C5A38E] text-white rounded-xl text-sm font-bold">+</button>
             </form>
           </section>
         </div>
 
-        {/* MODUL 2: BUCKETLIST VORSCHLÄGE (Mit Überraschungs-Logik) */}
-        {partnerProposals.length > 0 && (
-          <section className="animate-in fade-in slide-in-from-top-4 duration-700">
-            <h2 className="text-xs font-bold text-[#C5A38E] uppercase tracking-widest mb-4">Post von {partner?.name}</h2>
-            <div className="grid gap-4">
-              {partnerProposals.map(item => (
-                <div key={item.id} className="bg-[#C5A38E]/10 p-6 rounded-3xl border-2 border-dashed border-[#C5A38E]/30 flex justify-between items-center relative overflow-hidden">
-                  {/* Das Geheimnis! */}
-                  {item.isSurprise ? (
-                    <div className="absolute inset-0 bg-stone-900/90 backdrop-blur-md flex flex-col items-center justify-center text-center p-4">
-                      <span className="text-3xl mb-2">🎁</span>
-                      <p className="text-white font-bold mb-1">Überraschungs-Date!</p>
-                      <p className="text-stone-400 text-sm mb-4">Bist du dabei? (Budget: € {item.price})</p>
-                      <form action={async () => { "use server"; await approveBucketItem(item.id); }}>
-                        <button className="bg-[#C5A38E] text-white px-6 py-2 rounded-xl font-bold hover:scale-105 transition">Blind Zustimmen</button>
-                      </form>
-                    </div>
-                  ) : null}
-
-                  {/* Normale Ansicht, falls keine Überraschung */}
-                  <div className={item.isSurprise ? "opacity-0" : ""}>
-                    <p className="font-bold text-stone-800 dark:text-stone-100 text-xl">{item.title}</p>
-                    <p className="text-[#C5A38E] font-bold">€ {item.price.toLocaleString('de-DE')}</p>
-                  </div>
-                  <div className={`flex gap-3 ${item.isSurprise ? "opacity-0" : ""}`}>
-                    <form action={async () => { "use server"; await deleteBucketItem(item.id); }}><button className="px-4 py-2 text-stone-400">Ablehnen</button></form>
-                    <form action={async () => { "use server"; await approveBucketItem(item.id); }}><button className="bg-[#C5A38E] text-white px-6 py-2 rounded-xl font-bold">Zustimmen</button></form>
-                  </div>
+        {/* DAILY SYNC: Kassenbons */}
+        <section className="bg-white dark:bg-stone-900 p-6 rounded-3xl shadow-sm border border-stone-100 dark:border-stone-800 flex flex-col h-full">
+          <h2 className="text-sm font-bold text-stone-400 uppercase mb-4">Kassenbons (Dieser Monat)</h2>
+          <div className="flex-1 space-y-3 overflow-y-auto max-h-48 mb-4 pr-2">
+            {expenses.map(ex => (
+              <div key={ex.id} className="flex justify-between items-center text-sm border-b border-stone-50 dark:border-stone-800 pb-2">
+                <div className="flex flex-col">
+                  <span className="font-medium text-stone-700 dark:text-stone-300">{ex.title}</span>
+                  <span className="text-[10px] text-stone-400">{ex.user.name}</span>
                 </div>
-              ))}
-            </div>
-          </section>
-        )}
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-[#C5A38E]">-€ {ex.amount}</span>
+                  <form action={async () => { "use server"; await deleteExpense(ex.id); }}><button className="text-stone-300 hover:text-red-400">✕</button></form>
+                </div>
+              </div>
+            ))}
+          </div>
+          <form action={async (formData) => { "use server"; await addExpense(formData.get("title") as string, parseFloat(formData.get("amount") as string)); }} className="flex gap-2 mt-auto">
+            <input name="title" placeholder="Rewe, DM, Tanken..." className="flex-1 text-sm p-3 bg-stone-50 dark:bg-stone-950 rounded-xl outline-none border border-stone-100 dark:border-stone-800" required />
+            <input name="amount" type="number" step="0.01" placeholder="€" className="w-24 text-sm p-3 bg-stone-50 dark:bg-stone-950 rounded-xl outline-none border border-stone-100 dark:border-stone-800" required />
+            <button className="p-3 bg-stone-800 dark:bg-stone-700 text-white rounded-xl text-sm font-bold">+</button>
+          </form>
+        </section>
 
-        {/* MODUL 2: GEMEINSAME TRÄUME (Sinking Funds) */}
-        <section className="space-y-6">
-          <h2 className="text-xs font-bold text-stone-400 uppercase tracking-widest">Unsere Sparziele</h2>
-          <div className="grid gap-6">
-            {jointItems.map(item => {
-              const progressPct = Math.min((item.savedAmount / item.price) * 100, 100);
-              const isReady = progressPct >= 100;
+        {/* BUCKETLISTS */}
+        <div className="pt-6 border-t border-stone-200 dark:border-stone-800 space-y-10">
+          
+          {/* Gemeinsame Träume */}
+          <section className="space-y-6">
+            <h2 className="text-xs font-bold text-stone-400 uppercase tracking-widest flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-400"></span> Gemeinsame Träume & Sinking Funds
+            </h2>
+            <div className="grid gap-6">
+              {jointItems.map(item => {
+                const isZeroTarget = item.price === 0;
+                const progressPct = isZeroTarget ? 0 : Math.min((item.savedAmount / item.price) * 100, 100);
+                const isReady = !isZeroTarget && progressPct >= 100;
 
-              return (
-                <div key={item.id} className={`bg-white dark:bg-stone-900 p-6 rounded-3xl shadow-sm border ${isReady ? 'border-green-400 dark:border-green-500' : 'border-stone-100 dark:border-stone-800'} relative`}>
-                  <div className="flex justify-between items-start mb-6">
-                    <div>
-                      <h3 className="text-xl font-bold text-stone-800 dark:text-stone-100">{item.title} {item.isSurprise ? '🎁' : ''}</h3>
-                      <p className="text-sm text-stone-400">Ziel: € {item.price.toLocaleString('de-DE')}</p>
-                    </div>
-                    {isReady ? (
-                      <form action={async () => { "use server"; await markItemCompleted(item.id); }}>
-                        <button className="bg-green-500 text-white text-sm font-bold px-4 py-2 rounded-lg shadow-lg hover:bg-green-600 transition animate-pulse">Erlebt! ✓</button>
-                      </form>
-                    ) : (
-                      <form action={async () => { "use server"; await deleteBucketItem(item.id); }}>
-                        <button className="text-stone-300 dark:text-stone-600 hover:text-red-400 text-sm">Abbrechen</button>
-                      </form>
-                    )}
-                  </div>
-                  
-                  {/* Sinking Fund Progress */}
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-end">
-                      <div className="text-[10px] uppercase font-bold tracking-tighter text-stone-400">
-                        Gespart: € {item.savedAmount} / {progressPct.toFixed(0)}%
+                return (
+                  <div key={item.id} className={`bg-white dark:bg-stone-900 p-6 rounded-3xl shadow-sm border ${isReady ? 'border-green-400' : 'border-stone-100 dark:border-stone-800'} relative`}>
+                    <div className="flex justify-between items-start mb-6">
+                      <div>
+                        <h3 className="text-xl font-bold text-stone-800 dark:text-stone-100">{item.title} {item.isSurprise ? '🎁' : ''}</h3>
+                        <p className="text-sm text-stone-400">
+                          {isZeroTarget ? 'Offenes Ziel (Sparen ohne Limit)' : `Ziel: € ${item.price.toLocaleString('de-DE')}`}
+                        </p>
                       </div>
-                      {!isReady && (
-                        <form action={async (formData) => { "use server"; await addFundsToItem(item.id, parseFloat(formData.get("amount") as string)); }} className="flex gap-2">
-                           <input name="amount" type="number" placeholder="50" className="w-14 text-xs p-1.5 bg-stone-50 dark:bg-stone-950 dark:text-stone-200 border border-stone-200 dark:border-stone-800 rounded outline-none text-center" required />
-                           <button className="bg-stone-800 dark:bg-stone-700 text-white text-[10px] px-2 rounded hover:bg-[#C5A38E] transition">Einzahlen</button>
+                      {isReady ? (
+                        <form action={async () => { "use server"; await markItemCompleted(item.id); }}>
+                          <button className="bg-green-500 text-white text-sm font-bold px-4 py-2 rounded-lg shadow-lg hover:bg-green-600 animate-pulse">Erlebt! ✓</button>
+                        </form>
+                      ) : (
+                        <form action={async () => { "use server"; await deleteBucketItem(item.id); }}>
+                          <button className="text-stone-300 dark:text-stone-600 hover:text-red-400 text-sm">Abbrechen</button>
                         </form>
                       )}
                     </div>
-                    <div className="h-3 w-full bg-stone-100 dark:bg-stone-800 rounded-full overflow-hidden">
-                      <div className={`h-full transition-all duration-1000 ${isReady ? 'bg-green-400' : 'bg-[#C5A38E]'}`} style={{ width: `${progressPct}%` }} />
+                    
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-end">
+                        <div className="text-[10px] uppercase font-bold tracking-tighter text-stone-400">
+                          Gespart: € {item.savedAmount} {isZeroTarget ? '' : `/ ${progressPct.toFixed(0)}%`}
+                        </div>
+                        {!isReady && (
+                          <form action={async (formData) => { "use server"; await addFundsToItem(item.id, parseFloat(formData.get("amount") as string)); }} className="flex gap-2">
+                             <input name="amount" type="number" placeholder="50" className="w-14 text-xs p-1.5 bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 rounded outline-none text-center" required />
+                             <button className="bg-stone-800 dark:bg-stone-700 text-white text-[10px] px-2 rounded hover:bg-[#C5A38E]">Einzahlen</button>
+                          </form>
+                        )}
+                      </div>
+                      {!isZeroTarget && (
+                        <div className="h-3 w-full bg-stone-100 dark:bg-stone-800 rounded-full overflow-hidden">
+                          <div className={`h-full transition-all duration-1000 ${isReady ? 'bg-green-400' : 'bg-[#C5A38E]'}`} style={{ width: `${progressPct}%` }} />
+                        </div>
+                      )}
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* EIGENE OFFENE VORSCHLÄGE */}
-        {myProposals.length > 0 && (
-          <section className="space-y-4 opacity-70">
-            <h2 className="text-xs font-bold text-stone-400 uppercase tracking-widest">Warten auf {partner?.name || 'Partner'}</h2>
-            <div className="grid gap-3">
-              {myProposals.map(item => (
-                <div key={item.id} className="bg-stone-50 dark:bg-stone-900/50 p-4 rounded-2xl border border-dashed border-stone-200 dark:border-stone-800 flex justify-between items-center">
-                  <div>
-                    <p className="font-medium text-stone-600 dark:text-stone-400">{item.title} {item.isSurprise ? '(Überraschung)' : ''}</p>
-                  </div>
-                  <form action={async () => { "use server"; await deleteBucketItem(item.id); }}>
-                    <button className="text-stone-400 hover:text-red-400 transition text-sm font-medium">✕</button>
-                  </form>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
-        )}
 
-        {/* FLOATING ACTION BAR: Eingabe mit Checkbox für Überraschung */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Deine Liste */}
+            <section className="space-y-4 opacity-80">
+              <h2 className="text-xs font-bold text-stone-400 uppercase tracking-widest">Deine Liste</h2>
+              <div className="grid gap-3">
+                {myIndividualItems.map(item => (
+                  <div key={item.id} className="bg-stone-50 dark:bg-stone-900/50 p-4 rounded-2xl border border-stone-200 dark:border-stone-800 flex justify-between items-center">
+                    <div>
+                      <p className="font-medium text-stone-600 dark:text-stone-400">{item.title} {item.isSurprise ? '🎁' : ''}</p>
+                      <p className="text-xs text-stone-400">{item.price > 0 ? `€ ${item.price}` : 'Flex-Ziel (0€)'}</p>
+                    </div>
+                    <form action={async () => { "use server"; await deleteBucketItem(item.id); }}>
+                      <button className="text-stone-400 hover:text-red-400">✕</button>
+                    </form>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Partner Liste */}
+            <section className="space-y-4">
+              <h2 className="text-xs font-bold text-[#C5A38E] uppercase tracking-widest">Post von {partner?.name}</h2>
+              <div className="grid gap-3">
+                {partnerIndividualItems.map(item => (
+                  <div key={item.id} className="bg-[#C5A38E]/5 dark:bg-[#C5A38E]/10 p-4 rounded-2xl border-2 border-dashed border-[#C5A38E]/30 flex justify-between items-center relative overflow-hidden">
+                    {item.isSurprise && (
+                       <div className="absolute inset-0 bg-stone-900/95 flex items-center justify-between p-4 z-10">
+                          <span className="text-white font-bold text-sm flex items-center gap-2">🎁 Überraschung (€ {item.price})</span>
+                          <form action={async () => { "use server"; await approveBucketItem(item.id); }}><button className="bg-[#C5A38E] text-white px-4 py-1.5 rounded-lg text-xs font-bold">Blind Zustimmen</button></form>
+                       </div>
+                    )}
+                    <div className={item.isSurprise ? "opacity-0" : ""}>
+                      <p className="font-medium text-stone-800 dark:text-stone-200">{item.title}</p>
+                      <p className="text-xs text-[#C5A38E] font-bold">{item.price > 0 ? `€ ${item.price}` : 'Flex-Ziel (0€)'}</p>
+                    </div>
+                    {!item.isSurprise && (
+                      <form action={async () => { "use server"; await approveBucketItem(item.id); }}>
+                        <button className="bg-[#C5A38E] text-white px-4 py-1.5 rounded-xl text-xs font-bold shadow-md">👍 Zustimmen</button>
+                      </form>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+        </div>
+
+        {/* FLOATING ACTION BAR: Neuer Traum */}
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-lg z-50">
           <form action={async (formData) => { 
             "use server"; 
             await addBucketItem(
               formData.get("title") as string, 
-              parseFloat(formData.get("price") as string),
+              parseFloat(formData.get("price") as string) || 0,
               formData.get("isSurprise") === "on"
             ); 
           }} className="bg-stone-900/95 dark:bg-black/90 backdrop-blur-md p-3 rounded-2xl shadow-2xl flex flex-col gap-2 border border-stone-700/50">
             <div className="flex gap-2">
-              <input name="title" placeholder="Neuer Traum..." className="flex-1 bg-stone-800 border-none text-white text-sm px-4 py-2 rounded-xl outline-none" required />
-              <input name="price" type="number" placeholder="€" className="w-20 bg-stone-800 border-none text-white text-sm px-3 py-2 rounded-xl outline-none" required />
+              <input name="title" placeholder="Neuer Traum / Ziel..." className="flex-1 bg-stone-800 border-none text-white text-sm px-4 py-2 rounded-xl outline-none" required />
+              <input name="price" type="number" placeholder="€ (Optional)" className="w-24 bg-stone-800 border-none text-white text-sm px-3 py-2 rounded-xl outline-none" />
               <button type="submit" className="bg-[#C5A38E] text-white p-2 rounded-xl hover:bg-[#A38572] transition px-4 font-bold">+</button>
             </div>
             <label className="flex items-center gap-2 px-2 text-xs text-stone-400 cursor-pointer">
               <input type="checkbox" name="isSurprise" className="accent-[#C5A38E]" />
-              Als Überraschung anfragen (Titel bleibt versteckt)
+              Als Überraschung anfragen
             </label>
           </form>
         </div>

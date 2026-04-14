@@ -14,34 +14,29 @@ model User {
   email         String       @unique
   password      String       
   netIncome     Float        @default(0) 
+  chorePoints   Int          @default(0) // NEU: Punktekonto für den Putzplan
   
-  // Relationen
   items         BucketItem[] @relation("CreatedItems")
   approvedItems BucketItem[] @relation("ApprovedItems")
-  expenses      Expense[]    @relation("UserExpenses") // NEU: Für variable Ausgaben
+  expenses      Expense[]    @relation("UserExpenses")
+  dateIdeas     DateIdea[]   @relation("CreatedDates")
   
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 }
 
+// ... (BucketItem, FinancialObligation, Expense, ShoppingItem bleiben exakt wie vorher)
 model BucketItem {
   id          String   @id @default(cuid())
   title       String
-  price       Float
-  
-  // NEU: Modul 2 - Our Journeys 2.0
-  savedAmount Float    @default(0)     // Sinking Fund: Wie viel wurde schon angespart?
-  isSurprise  Boolean  @default(false) // Blind Proposal: Ist es eine Überraschung?
-  isCompleted Boolean  @default(false) // Memory Archive: Ist der Traum erfüllt?
-  
-  // Wer hat es erstellt?
+  price       Float    @default(0)
+  savedAmount Float    @default(0)
+  isSurprise  Boolean  @default(false)
+  isCompleted Boolean  @default(false)
   creatorId   String
   creator     User     @relation("CreatedItems", fields: [creatorId], references: [id])
-  
-  // Hat der andere zugestimmt? (Daumen hoch System)
   approverId  String?
   approver    User?    @relation("ApprovedItems", fields: [approverId], references: [id])
-  
   isPurchased Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -51,20 +46,65 @@ model FinancialObligation {
   id          String   @id @default(cuid())
   title       String
   amount      Float
-  type        String   // z.B. "SCHULDEN_RATE", "FIXKOSTEN", "GEMEINSAME_AUSGABE"
-  isShared    Boolean  @default(true) // Tragen es beide oder nur einer?
+  type        String   
+  isShared    Boolean  @default(true) 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
 
-// NEU: Modul 1 - Variable Ausgaben (Der Daily Sync)
 model Expense {
   id          String   @id @default(cuid())
-  title       String   // z.B. "Rewe", "Tanken"
+  title       String   
   amount      Float
   date        DateTime @default(now())
-  
-  // Wer hat es bezahlt?
   userId      String
   user        User     @relation("UserExpenses", fields: [userId], references: [id])
+}
+
+model ShoppingItem {
+  id        String   @id @default(cuid())
+  title     String
+  checked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+// --- NEUE MODULE ---
+
+// 1. Gamifizierter Putzplan
+model Chore {
+  id          String   @id @default(cuid())
+  title       String
+  points      Int      @default(10)
+  lastDoneBy  String?  // Name des Users
+  lastDoneAt  DateTime?
+  createdAt   DateTime @default(now())
+}
+
+// 2. Date-Night Roulette
+model DateIdea {
+  id          String   @id @default(cuid())
+  title       String
+  isUsed      Boolean  @default(false)
+  creatorId   String
+  creator     User     @relation("CreatedDates", fields: [creatorId], references: [id])
+  createdAt   DateTime @default(now())
+}
+
+// 3. Meal Prep Planer
+model MealPlan {
+  id          String   @id @default(cuid())
+  dayOfWeek   Int      // 1 = Montag, 7 = Sonntag
+  mealType    String   // "LUNCH" oder "DINNER"
+  recipe      String
+  ingredients String[] // Array für den Auto-Sync zur Einkaufsliste
+  createdAt   DateTime @default(now())
+}
+
+// 4. Dokumenten Tresor
+model VaultItem {
+  id          String   @id @default(cuid())
+  title       String
+  url         String   // Link (z.B. Google Drive)
+  addedBy     String
+  createdAt   DateTime @default(now())
 }

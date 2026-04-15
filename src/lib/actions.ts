@@ -393,6 +393,11 @@ export async function deleteSmartDevice(id: string) {
 
 // Neue Funktion für Govee (Farbe & Helligkeit)
 export async function setGoveeDeviceState(id: string, cmdName: "color" | "brightness", value: any) {
+  // --- SECURITY CHECK ---
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.email) throw new Error("Nicht autorisiert");
+  // ----------------------
+
   const device = await prisma.smartDevice.findUnique({ where: { id } });
   if (!device || !device.externalId || !device.modelCode) return;
 
@@ -407,7 +412,7 @@ export async function setGoveeDeviceState(id: string, cmdName: "color" | "bright
       model: device.modelCode,
       cmd: {
         name: cmdName,
-        value: value // Bei Farbe: {r, g, b}, bei Helligkeit: 0-100
+        value: value 
       }
     })
   });
@@ -416,6 +421,11 @@ export async function setGoveeDeviceState(id: string, cmdName: "color" | "bright
 
 // Neue Funktion für Samsung TV Befehle
 export async function sendTvCommand(id: string, capability: string, command: string, args: any[] = []) {
+  // --- SECURITY CHECK ---
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.email) throw new Error("Nicht autorisiert");
+  // ----------------------
+
   const device = await prisma.smartDevice.findUnique({ where: { id } });
   if (!device || !device.externalId) return;
 
@@ -428,8 +438,8 @@ export async function sendTvCommand(id: string, capability: string, command: str
     body: JSON.stringify({
       commands: [{
         component: "main",
-        capability: capability, // z.B. "audioVolume" oder "mediaPlayback"
-        command: command,       // z.B. "volumeUp", "play", "pause"
+        capability: capability,
+        command: command,
         arguments: args
       }]
     })

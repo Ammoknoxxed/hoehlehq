@@ -390,3 +390,49 @@ export async function deleteSmartDevice(id: string) {
   await prisma.smartDevice.delete({ where: { id } });
   revalidatePath("/smarthome");
 }
+
+// Neue Funktion für Govee (Farbe & Helligkeit)
+export async function setGoveeDeviceState(id: string, cmdName: "color" | "brightness", value: any) {
+  const device = await prisma.smartDevice.findUnique({ where: { id } });
+  if (!device || !device.externalId || !device.modelCode) return;
+
+  const GOVEE_KEY = process.env.GOVEE_API_KEY;
+  if (!GOVEE_KEY) return;
+
+  await fetch('https://developer-api.govee.com/v1/devices/control', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Govee-API-Key': GOVEE_KEY },
+    body: JSON.stringify({
+      device: device.externalId,
+      model: device.modelCode,
+      cmd: {
+        name: cmdName,
+        value: value // Bei Farbe: {r, g, b}, bei Helligkeit: 0-100
+      }
+    })
+  });
+  revalidatePath("/smarthome");
+}
+
+// Neue Funktion für Samsung TV Befehle
+export async function sendTvCommand(id: string, capability: string, command: string, args: any[] = []) {
+  const device = await prisma.smartDevice.findUnique({ where: { id } });
+  if (!device || !device.externalId) return;
+
+  const ST_TOKEN = process.env.SMARTTHINGS_TOKEN;
+  if (!ST_TOKEN) return;
+
+  await fetch(`https://api.smartthings.com/v1/devices/${device.externalId}/commands`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${ST_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      commands: [{
+        component: "main",
+        capability: capability, // z.B. "audioVolume" oder "mediaPlayback"
+        command: command,       // z.B. "volumeUp", "play", "pause"
+        arguments: args
+      }]
+    })
+  });
+  revalidatePath("/smarthome");
+}

@@ -92,16 +92,16 @@ model MealPlan {
   mealType    String   
   recipe      String
   ingredients String[] 
-  recipeNotes String?  // NEU: Für Links oder Kochanleitungen
+  recipeNotes String?
   createdAt   DateTime @default(now())
 }
 
 model VaultItem {
   id          String   @id @default(cuid())
   title       String
-  url         String?  // Jetzt optional
-  fileData    String?  // NEU: Base64 Datei-Inhalt
-  fileType    String?  // NEU: z.B. application/pdf
+  url         String?
+  fileData    String?
+  fileType    String?
   addedBy     String
   createdAt   DateTime @default(now())
 }
@@ -128,7 +128,7 @@ model Trip {
   title       String
   destination String
   date        DateTime
-  savedAmount Float    @default(0) // NEU: Angespartes Geld
+  savedAmount Float    @default(0)
   isCompleted Boolean  @default(false)
   createdAt   DateTime @default(now())
 }
@@ -216,8 +216,9 @@ model PetHealthEvent {
 model PantryItem {
   id        String   @id @default(cuid())
   name      String
-  count     Int      @default(0)
-  minCount  Int      @default(1)
+  count     Float    @default(0)
+  minCount  Float    @default(1)
+  unit      String   @default("Stück")
   updatedAt DateTime @updatedAt
 }
 

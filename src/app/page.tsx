@@ -8,7 +8,7 @@ import {
   addExpense, deleteExpense, addFundsToItem, markItemCompleted,
   addStickyNote, deleteStickyNote, consumePetFood, addPetFood,
   cleanLitterBox, addHealthEvent, deleteHealthEvent,
-  updatePantryCount, addPantryItem, deletePantryItem,
+  setPantryCount, addPantryItem, deletePantryItem, // HIER GEÄNDERT
   addEnergyReading, deleteEnergyReading, updateEnergySettings,
   addSharedContact, deleteSharedContact,
   updateNetIncome, addObligation, deleteObligation
@@ -25,21 +25,16 @@ import {
 
 // --- HILFSFUNKTIONEN ---
 function getHygieneStatus(lastCleanAt?: Date | null) {
-  if (!lastCleanAt) return { text: "Nie", color: "text-rose-500", bg: "bg-rose-500/10 border-rose-500/20", level: 3 }; // Kritisch
+  if (!lastCleanAt) return { text: "Nie", color: "text-rose-500", bg: "bg-rose-500/10 border-rose-500/20", level: 3 };
   const hours = (new Date().getTime() - lastCleanAt.getTime()) / (1000 * 60 * 60);
-  if (hours < 12) return { text: "Frisch", color: "text-emerald-500", bg: "bg-emerald-500/10 border-emerald-500/20", level: 1 }; // Okay
-  if (hours < 24) return { text: "Okay", color: "text-amber-500", bg: "bg-amber-500/10 border-amber-500/20", level: 2 }; // Warnung
-  return { text: "Kritisch", color: "text-rose-500", bg: "bg-rose-500/10 border-rose-500/20 animate-pulse", level: 3 }; // Kritisch
+  if (hours < 12) return { text: "Frisch", color: "text-emerald-500", bg: "bg-emerald-500/10 border-emerald-500/20", level: 1 };
+  if (hours < 24) return { text: "Okay", color: "text-amber-500", bg: "bg-amber-500/10 border-amber-500/20", level: 2 };
+  return { text: "Kritisch", color: "text-rose-500", bg: "bg-rose-500/10 border-rose-500/20 animate-pulse", level: 3 };
 }
 
-// NEU: Püppi Animated Icon Komponente (Client-Side Animation Logic)
 function PueppiIcon({ statusLevel }: { statusLevel: number }) {
-  // statusLevel: 1 = Okay (emerald), 2 = Warnung (amber), 3 = Kritisch (rose)
-  
   const baseClasses = "w-16 h-16 transition-all duration-500";
-  
   if (statusLevel === 3) {
-    // Kritisch: Miaut/Alarm (Schneller Puls + Rotes Glühen)
     return (
       <div className="relative group">
         <div className="absolute inset-0 bg-rose-500/30 rounded-full blur-xl animate-pulse"></div>
@@ -48,18 +43,14 @@ function PueppiIcon({ statusLevel }: { statusLevel: number }) {
       </div>
     );
   }
-  
   if (statusLevel === 2) {
-    // Warnung: Besorgt (Langsamer Puls)
     return (
       <div className="relative">
-        <div className="absolute inset-0 bg-amber-500/10 rounded-full blur-lg animate-pulse-slow"></div>
+        <div className="absolute inset-0 bg-amber-500/10 rounded-full blur-lg animate-pulse"></div>
         <Cat className={`${baseClasses} text-amber-500 animate-pulse relative z-10`} strokeWidth={1.5} />
       </div>
     );
   }
-
-  // Normal / Okay: Zufrieden/Schläft (Statisch, warme Farbe)
   return (
     <div className="relative">
       <Cat className={`${baseClasses} text-[#C5A38E] hover:scale-110 transition-transform`} strokeWidth={1} />
@@ -71,7 +62,6 @@ export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) redirect("/login");
 
-  // --- DATEN ABRUFEN ---
   const allUsers = await prisma.user.findMany();
   const currentUser = allUsers.find(u => u.email === session.user?.email);
   const partner = allUsers.find(u => u.email !== session.user?.email);
@@ -110,7 +100,6 @@ export default async function DashboardPage() {
     orderBy: { createdAt: 'desc' }
   });
 
-  // --- MATHEMATIK & LOGIK ---
   const myIncome = currentUser?.netIncome || 0;
   const partnerIncome = partner?.netIncome || 0;
   const totalIncome = myIncome + partnerIncome;
@@ -134,7 +123,6 @@ export default async function DashboardPage() {
   const myIndividualItems = activeItems.filter(i => i.creatorId === currentUser?.id && i.approverId === null);
   const partnerIndividualItems = activeItems.filter(i => i.creatorId === partner?.id && i.approverId === null);
 
-  // NEU: Püppi Status Berechnen
   const foodStatusLevel = petFood.cans > 5 ? 1 : petFood.cans > 2 ? 2 : 3;
   const litter1Status = getHygieneStatus(lastCleanBox1?.createdAt);
   const litter2Status = getHygieneStatus(lastCleanBox2?.createdAt);
@@ -241,17 +229,42 @@ export default async function DashboardPage() {
               <p className="text-xs uppercase tracking-widest font-bold text-stone-500 mb-2">Haushalts-Cashflow</p>
               <h2 className="text-5xl md:text-6xl font-light tracking-tighter tabular-nums text-[#C5A38E]">€ {freeCashflow.toLocaleString('de-DE', { maximumFractionDigits: 0 })}</h2>
             </div>
-            <div className="relative z-10 mt-6 pt-6 border-t border-stone-800 flex flex-col sm:flex-row justify-between gap-6">
-              <div>
-                <p className="text-[10px] uppercase font-bold text-stone-500">Dein Netto-Einkommen</p>
-                <form action={async (formData) => { "use server"; await updateNetIncome(parseFloat(formData.get("income") as string)); }} className="flex items-center gap-2 mt-2">
-                  <input name="income" type="number" placeholder={`€ ${currentUser?.netIncome}`} className="w-24 px-3 py-2 bg-stone-800 rounded-xl outline-none text-sm font-medium border border-transparent focus:border-[#C5A38E]" required />
-                  <button className="bg-[#C5A38E] text-stone-900 px-3 py-2 rounded-xl text-xs font-bold hover:bg-[#A38572] transition-colors">Save</button>
-                </form>
+            
+            <div className="relative z-10 mt-6 pt-6 border-t border-stone-800 space-y-8">
+              <div className="flex flex-col sm:flex-row justify-between gap-6">
+                <div>
+                  <p className="text-[10px] uppercase font-bold text-stone-500">Dein Netto-Einkommen</p>
+                  <form action={async (formData) => { "use server"; await updateNetIncome(parseFloat(formData.get("income") as string)); }} className="flex items-center gap-2 mt-2">
+                    <input name="income" type="number" placeholder={`€ ${currentUser?.netIncome}`} className="w-24 px-3 py-2 bg-stone-800 rounded-xl outline-none text-sm font-medium border border-transparent focus:border-[#C5A38E]" required />
+                    <button className="bg-[#C5A38E] text-stone-900 px-3 py-2 rounded-xl text-xs font-bold hover:bg-[#A38572] transition-colors">Save</button>
+                  </form>
+                </div>
+                <div className="flex flex-col justify-end text-right">
+                  <span className="text-[10px] uppercase font-bold text-stone-500">Fixkosten Gesamt</span>
+                  <span className="text-xl font-bold tracking-tight">€ {totalFixed}</span>
+                </div>
               </div>
-              <div className="flex flex-col justify-end text-right">
-                <span className="text-[10px] uppercase font-bold text-stone-500">Fixkosten Gesamt</span>
-                <span className="text-xl font-bold tracking-tight">€ {totalFixed}</span>
+
+              <div className="space-y-4">
+                <p className="text-[10px] uppercase font-bold text-stone-500 border-b border-stone-800 pb-2">Monatliche Fixkosten verwalten</p>
+                <div className="space-y-2 max-h-40 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-stone-800">
+                   {obligations.map(ob => (
+                     <div key={ob.id} className="flex justify-between items-center text-[11px] text-stone-400 group">
+                        <span className="truncate max-w-[150px]">{ob.title}</span>
+                        <div className="flex items-center gap-3">
+                           <span className="tabular-nums">€ {ob.amount.toFixed(0)}</span>
+                           <form action={async () => { "use server"; await deleteObligation(ob.id); }}>
+                              <button className="opacity-0 group-hover:opacity-100 text-stone-600 hover:text-rose-500 transition-all"><X size={12}/></button>
+                           </form>
+                        </div>
+                     </div>
+                   ))}
+                </div>
+                <form action={async (formData) => { "use server"; await addObligation(formData.get("title") as string, parseFloat(formData.get("amount") as string)); }} className="flex gap-2">
+                   <input name="title" placeholder="Miete, Strom, etc." className="flex-1 bg-stone-800 border-none text-[10px] px-3 py-2 rounded-xl outline-none focus:ring-1 focus:ring-[#C5A38E]" required />
+                   <input name="amount" type="number" step="0.01" placeholder="€" className="w-20 bg-stone-800 border-none text-[10px] px-3 py-2 rounded-xl outline-none focus:ring-1 focus:ring-[#C5A38E]" required />
+                   <button className="bg-[#C5A38E] text-stone-900 px-4 py-2 rounded-xl text-[10px] font-bold hover:bg-[#A38572] transition-colors">+</button>
+                </form>
               </div>
             </div>
           </div>
@@ -374,8 +387,8 @@ export default async function DashboardPage() {
         {/* OPERATION MODULES GRID */}
         <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           
-          {/* VORRATSSCHRANK */}
-          <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-[2.5rem] p-6 shadow-sm flex flex-col h-[400px] transition-colors">
+          {/* VORRATSSCHRANK NEU */}
+          <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-[2.5rem] p-6 shadow-sm flex flex-col h-[450px] transition-colors">
             <div className="flex items-center gap-2 mb-4">
               <ShoppingCart size={18} className="text-[#C5A38E]" />
               <h3 className="text-xs font-bold uppercase tracking-widest text-stone-400">Vorratsschrank</h3>
@@ -387,21 +400,35 @@ export default async function DashboardPage() {
                     <form action={async () => { "use server"; await deletePantryItem(item.id); }}>
                       <button className="opacity-0 group-hover:opacity-100 text-stone-400 hover:text-rose-500 transition-all"><Trash2 size={12}/></button>
                     </form>
-                    <span className={`text-sm ${item.count <= item.minCount ? 'text-rose-500 font-bold animate-pulse' : ''}`}>{item.name}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-bold tabular-nums">{item.count}</span>
-                    <div className="flex gap-1">
-                      <form action={async () => { "use server"; await updatePantryCount(item.id, -1); }}><button className="w-8 h-8 bg-white dark:bg-stone-800 rounded-lg text-xs shadow-sm hover:bg-stone-100 dark:hover:bg-stone-700 transition">-</button></form>
-                      <form action={async () => { "use server"; await updatePantryCount(item.id, 1); }}><button className="w-8 h-8 bg-stone-900 dark:bg-stone-700 text-white rounded-lg text-xs shadow-sm hover:bg-stone-700 dark:hover:bg-stone-600 transition">+</button></form>
+                    <div className="flex flex-col">
+                      <span className={`text-sm ${item.count <= item.minCount ? 'text-rose-500 font-bold animate-pulse' : ''}`}>{item.name}</span>
+                      <span className="text-[9px] text-stone-400 uppercase">Min: {item.minCount} {item.unit}</span>
                     </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <form action={async (formData) => { "use server"; await setPantryCount(item.id, parseFloat(formData.get("val") as string)); }} className="flex items-center gap-2">
+                      <input name="val" type="number" step="any" defaultValue={item.count} className="w-16 h-8 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 rounded-lg text-xs text-center outline-none focus:border-[#C5A38E] transition-colors" />
+                      <span className="text-[10px] font-bold text-stone-500 w-10 truncate">{item.unit}</span>
+                      <button className="w-8 h-8 bg-stone-900 dark:bg-stone-700 text-white rounded-lg text-xs shadow-sm hover:bg-stone-700 dark:hover:bg-stone-600 transition">✓</button>
+                    </form>
                   </div>
                 </div>
               ))}
             </div>
-            <form action={async (formData) => { "use server"; await addPantryItem(formData.get("name") as string); }} className="mt-4 flex gap-2">
-              <input name="name" placeholder="Hinzufügen..." className="flex-1 h-10 bg-stone-50 dark:bg-stone-950 px-4 rounded-xl text-xs outline-none focus:border-[#C5A38E] border border-transparent transition" required />
-              <button className="w-10 h-10 bg-[#C5A38E] text-white rounded-xl shadow-sm hover:bg-[#A38572] transition-colors"><Plus size={16} className="mx-auto" /></button>
+            <form action={async (formData) => { "use server"; await addPantryItem(formData.get("name") as string, formData.get("unit") as string, parseFloat(formData.get("min") as string)); }} className="mt-4 flex flex-col gap-2 bg-stone-50 dark:bg-stone-950 p-3 rounded-2xl border border-stone-100 dark:border-stone-800">
+              <input name="name" placeholder="Hinzufügen (z.B. Mehl)..." className="w-full h-10 bg-white dark:bg-stone-900 px-4 rounded-xl text-xs outline-none focus:border-[#C5A38E] border border-stone-200 dark:border-stone-800 transition" required />
+              <div className="flex gap-2">
+                <select name="unit" className="w-1/3 h-10 bg-white dark:bg-stone-900 px-2 rounded-xl text-xs outline-none border border-stone-200 dark:border-stone-800 focus:border-[#C5A38E] transition">
+                  <option value="Stück">Stück</option>
+                  <option value="Gramm">Gramm</option>
+                  <option value="Kg">Kg</option>
+                  <option value="Liter">Liter</option>
+                  <option value="ml">ml</option>
+                  <option value="Packung">Pack.</option>
+                </select>
+                <input name="min" type="number" step="any" placeholder="Min. Bestand..." className="flex-1 h-10 bg-white dark:bg-stone-900 px-3 rounded-xl text-xs outline-none focus:border-[#C5A38E] border border-stone-200 dark:border-stone-800 transition" required />
+                <button className="w-10 h-10 bg-[#C5A38E] text-white rounded-xl shadow-sm hover:bg-[#A38572] transition-colors"><Plus size={16} className="mx-auto" /></button>
+              </div>
             </form>
           </div>
 
@@ -413,7 +440,6 @@ export default async function DashboardPage() {
                   <Zap size={18} />
                   <h3 className="text-xs font-bold uppercase tracking-widest text-stone-400">Energy Radar</h3>
                 </div>
-                {/* SETTINGS BUTTON */}
                 <details className="relative group/settings">
                   <summary className="list-none cursor-pointer text-stone-400 hover:text-stone-600"><Settings size={14} /></summary>
                   <div className="absolute right-0 top-6 w-48 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-3 shadow-xl z-20 transition-colors">
@@ -432,11 +458,8 @@ export default async function DashboardPage() {
                   </div>
                 </details>
               </div>
-
-              {/* ENERGY CONTENT (Vom User Beibehalten) */}
               <p className="text-xs text-stone-400 italic mb-4">Zählerstände hier eintragen.</p>
             </div>
-            {/* ENERGY FORM (Vom User Beibehalten) */}
           </div>
 
           {/* SHARED CONTACTS */}
@@ -524,7 +547,7 @@ export default async function DashboardPage() {
             </form>
           </div>
 
-          {/* NEU: PÜPPI CARES (Aesthetic & Animated) */}
+          {/* PÜPPI CARES */}
           <div className="bg-stone-900 text-white rounded-[2.5rem] p-8 shadow-2xl flex flex-col justify-between overflow-hidden relative transition-colors duration-500" 
                style={{ boxShadow: overallPueppiStatus === 3 ? '0 0 40px -5px rgba(239, 68, 68, 0.3)' : overallPueppiStatus === 2 ? '0 0 30px -5px rgba(245, 158, 11, 0.2)' : '0 10px 30px -10px rgba(0,0,0,0.5)' }}>
             
@@ -546,20 +569,18 @@ export default async function DashboardPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-3 mb-8 relative z-10">
-              {/* Klo 1 Card */}
               <div className={`p-4 rounded-2xl border transition-colors ${getHygieneStatus(lastCleanBox1?.createdAt).bg}`}>
                 <div className="flex justify-between items-center mb-1.5">
-                    <span className="text-xs font-bold uppercase tracking-wider text-stone-700 dark:text-stone-300">Toilette Wohnzimmer</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-stone-700 dark:text-stone-300">Haupt-Klo</span>
                     <form action={async () => { "use server"; await cleanLitterBox(1); }}>
                         <button className="h-9 w-9 bg-black/20 hover:bg-black/40 rounded-full flex items-center justify-center transition-colors text-white font-bold">✓</button>
                     </form>
                 </div>
                 <p className="text-[10px] text-stone-600 dark:text-stone-400 uppercase tracking-widest">Zuletzt: {lastCleanBox1 ? lastCleanBox1.createdAt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : 'Unbekannt'}</p>
               </div>
-              {/* Klo 2 Card */}
               <div className={`p-4 rounded-2xl border transition-colors ${getHygieneStatus(lastCleanBox2?.createdAt).bg}`}>
                 <div className="flex justify-between items-center mb-1.5">
-                    <span className="text-xs font-bold uppercase tracking-wider text-stone-700 dark:text-stone-300">Toilette Püppizimmer</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-stone-700 dark:text-stone-300">Zweit-Klo</span>
                     <form action={async () => { "use server"; await cleanLitterBox(2); }}>
                         <button className="h-9 w-9 bg-black/20 hover:bg-black/40 rounded-full flex items-center justify-center transition-colors text-white font-bold">✓</button>
                     </form>
@@ -572,11 +593,6 @@ export default async function DashboardPage() {
               <form action={consumePetFood} className="flex-1"><button className="w-full h-12 bg-stone-800/80 rounded-2xl text-xs font-bold hover:bg-rose-500/20 hover:text-rose-500 transition-colors duration-300">-1 Dose</button></form>
               <form action={async () => { "use server"; await addPetFood(6); }} className="flex-1"><button className="w-full h-12 bg-[#C5A38E] text-stone-900 rounded-2xl text-xs font-bold hover:bg-[#A38572] transition-colors duration-300">+6 Dosen</button></form>
             </div>
-            
-            {/* Subtile Foto-Integration im Hintergrund */}
-            <div className="absolute inset-0 z-0 opacity-[0.03] transition-opacity duration-1000 group-hover:opacity-[0.05]" 
-                 style={{ backgroundImage: 'url(https:// hoehlehq.vercel.app/api/placeholder/1200/800)', // Platzhalter, da Base64 Foto-Hacking komplex ist
-                          backgroundSize: 'cover', backgroundPosition: 'center' }} />
           </div>
 
         </section>

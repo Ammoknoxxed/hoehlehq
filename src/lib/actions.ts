@@ -8,7 +8,6 @@ import { authOptions } from "@/lib/auth";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 
-// --- HILFSFUNKTION: SECURITY CHECK ---
 async function requireAuth() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) throw new Error("Nicht autorisiert: Zugriff verweigert.");
@@ -17,7 +16,6 @@ async function requireAuth() {
   return { session, user };
 }
 
-// --- BILDER UPLOAD (INTERN FÜR SCHWARZES BRETT) ---
 export async function uploadImage(formData: FormData) {
   await requireAuth();
   const file = formData.get("file") as File;
@@ -25,18 +23,15 @@ export async function uploadImage(formData: FormData) {
 
   const bytes = await file.arrayBuffer();
   const buffer = Buffer.from(bytes);
-  
   const filename = `${Date.now()}-${file.name.replace(/\s/g, '_')}`;
   const uploadDir = join(process.cwd(), "public/uploads");
   const filepath = join(uploadDir, filename);
   
   await mkdir(uploadDir, { recursive: true });
   await writeFile(filepath, buffer);
-  
   return `/uploads/${filename}`;
 }
 
-// --- NUTZER & EINKOMMEN ---
 export async function updateNetIncome(amount: number) {
   const { user } = await requireAuth();
   await prisma.user.update({
@@ -46,7 +41,6 @@ export async function updateNetIncome(amount: number) {
   revalidatePath("/");
 }
 
-// --- BUCKETLIST & SINKING FUNDS ---
 export async function addBucketItem(title: string, price: number, isSurprise: boolean = false) {
   const { user } = await requireAuth();
   await prisma.bucketItem.create({
@@ -91,7 +85,6 @@ export async function markItemCompleted(itemId: string) {
   revalidatePath("/");
 }
 
-// --- FIXKOSTEN & ABOS ---
 export async function addObligation(title: string, amount: number) {
   await requireAuth();
   await prisma.financialObligation.create({
@@ -132,7 +125,6 @@ export async function deleteSubscription(id: string) {
   revalidatePath("/");
 }
 
-// --- VARIABLE AUSGABEN (DAILY SYNC) ---
 export async function addExpense(title: string, amount: number) {
   const { user } = await requireAuth();
   await prisma.expense.create({
@@ -147,7 +139,6 @@ export async function deleteExpense(id: string) {
   revalidatePath("/");
 }
 
-// --- EINKAUFSLISTE ---
 export async function addShoppingItem(title: string) {
   await requireAuth();
   await prisma.shoppingItem.create({ data: { title } });
@@ -166,7 +157,6 @@ export async function clearShoppingList() {
   revalidatePath("/shopping");
 }
 
-// --- HOME WIKI ---
 export async function addWikiEntry(title: string, content: string, category: string) {
   const { user } = await requireAuth();
   await prisma.wikiEntry.create({
@@ -181,7 +171,6 @@ export async function deleteWikiEntry(id: string) {
   revalidatePath("/wiki");
 }
 
-// --- PUTZPLAN (CHORES) ---
 export async function addChore(title: string, points: number) {
   await requireAuth();
   await prisma.chore.create({
@@ -204,7 +193,6 @@ export async function completeChore(choreId: string, points: number) {
   revalidatePath("/chores");
 }
 
-// --- DATE NIGHT ROULETTE ---
 export async function addDateIdea(title: string) {
   const { user } = await requireAuth();
   await prisma.dateIdea.create({
@@ -222,7 +210,6 @@ export async function markDateUsed(id: string) {
   revalidatePath("/roulette");
 }
 
-// --- MEAL PREP (Angepasst für Notizen/Links) ---
 export async function addMealPlan(dayOfWeek: number, mealType: string, recipe: string, ingredientsInput: string, recipeNotes: string = "") {
   await requireAuth();
   const ingredients = ingredientsInput.split(',').map(i => i.trim()).filter(i => i.length > 0);
@@ -251,7 +238,6 @@ export async function syncIngredientsToShoppingList(mealId: string) {
   revalidatePath("/shopping");
 }
 
-// --- TRESOR (VAULT) (Angepasst für echten Datei-Upload Base64) ---
 export async function addVaultItem(formData: FormData) {
   const { user } = await requireAuth();
   const title = formData.get("title") as string;
@@ -269,7 +255,6 @@ export async function addVaultItem(formData: FormData) {
     fileData = `data:${file.type};base64,${base64}`;
   }
 
-  // Wenn weder eine Datei noch eine URL hochgeladen wurde, abbrechen
   if (!url && !fileData) return;
 
   await prisma.vaultItem.create({
@@ -290,7 +275,6 @@ export async function deleteVaultItem(id: string) {
   revalidatePath("/vault");
 }
 
-// --- SECRET GIFTS ---
 export async function addGiftIdea(title: string, priceStr: string, url: string) {
   const { user } = await requireAuth();
   const price = priceStr ? Math.abs(parseFloat(priceStr)) : null;
@@ -312,24 +296,22 @@ export async function deleteGiftIdea(id: string) {
   revalidatePath("/gifts");
 }
 
-// --- KALENDER (TIMELINE) (Angepasst: Revalidiert nun auch das Dashboard) ---
 export async function addTimelineEvent(title: string, dateStr: string, type: string) {
   const { user } = await requireAuth();
   await prisma.timelineEvent.create({
     data: { title, date: new Date(dateStr), type, creatorId: user.id }
   });
   revalidatePath("/timeline");
-  revalidatePath("/"); // Update für das neue Dashboard-Widget
+  revalidatePath("/"); 
 }
 
 export async function deleteTimelineEvent(id: string) {
   await requireAuth();
   await prisma.timelineEvent.delete({ where: { id } });
   revalidatePath("/timeline");
-  revalidatePath("/"); // Update für das neue Dashboard-Widget
+  revalidatePath("/"); 
 }
 
-// --- WEEKLY SYNC (CHECK-IN) ---
 export async function submitCheckIn(weekYear: string, highlight: string, stress: string, nextWeek: string) {
   const { user } = await requireAuth();
   await prisma.checkInAnswer.create({
@@ -338,7 +320,6 @@ export async function submitCheckIn(weekYear: string, highlight: string, stress:
   revalidatePath("/checkin");
 }
 
-// --- WELTKARTE & REISEKOFFER (Angepasst für Budget und Löschen) ---
 export async function addTravelPoint(name: string, type: string) {
   await requireAuth();
   await prisma.travelPoint.create({ data: { name, type } });
@@ -369,7 +350,6 @@ export async function addTrip(title: string, destination: string, dateStr: strin
   revalidatePath("/");
 }
 
-// --- SMART HOME LOGIK ---
 export async function addSmartDevice(name: string, type: string, room: string, externalId?: string, modelCode?: string) {
   const { user } = await requireAuth();
   await prisma.smartDevice.create({
@@ -499,7 +479,6 @@ export async function sendTvCommand(id: string, capability: string, command: str
   }
 }
 
-// --- SCHWARZES BRETT (STICKY NOTES MIT BASE64 BILDER-HACK FÜR RAILWAY) ---
 export async function addStickyNote(formData: FormData) {
   const { user } = await requireAuth();
   const text = formData.get("text") as string;
@@ -527,7 +506,6 @@ export async function deleteStickyNote(id: string) {
   revalidatePath("/");
 }
 
-// --- PÜPPI'S HYGIENE, HEALTH & FOOD ---
 export async function consumePetFood() {
   await requireAuth();
   const petFood = await prisma.petFood.findFirst();
@@ -577,12 +555,12 @@ export async function deleteHealthEvent(id: string) {
   revalidatePath("/");
 }
 
-// --- VORRATSSCHRANK (PANTRY) ---
-export async function updatePantryCount(id: string, change: number) {
+// --- VORRATSSCHRANK (NEU MIT DIRECT SET UND UNIT) ---
+export async function setPantryCount(id: string, count: number) {
   const item = await prisma.pantryItem.findUnique({ where: { id } });
   if (!item) return;
 
-  const newCount = Math.max(0, item.count + change);
+  const newCount = Math.max(0, count);
   await prisma.pantryItem.update({
     where: { id },
     data: { count: newCount }
@@ -597,9 +575,11 @@ export async function updatePantryCount(id: string, change: number) {
   revalidatePath("/");
 }
 
-export async function addPantryItem(name: string) {
+export async function addPantryItem(name: string, unit: string, minCount: number) {
   await requireAuth();
-  await prisma.pantryItem.create({ data: { name, minCount: 1, count: 0 } });
+  await prisma.pantryItem.create({ 
+    data: { name, unit, minCount: Math.max(0, minCount), count: 0 } 
+  });
   revalidatePath("/");
 }
 
@@ -609,7 +589,6 @@ export async function deletePantryItem(id: string) {
   revalidatePath("/");
 }
 
-// --- ENERGY RADAR ---
 export async function addEnergyReading(type: string, value: number) {
   await requireAuth();
   await prisma.energyReading.create({ data: { type, value: Math.abs(value) } });
@@ -633,7 +612,6 @@ export async function updateEnergySettings(kwhPrice: number, monthlyPrepayment: 
   revalidatePath("/");
 }
 
-// --- SHARED CONTACTS ---
 export async function addSharedContact(name: string, role: string, phone?: string, email?: string) {
   await requireAuth();
   await prisma.sharedContact.create({ data: { name, role, phone, email } });

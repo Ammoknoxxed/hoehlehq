@@ -56,6 +56,7 @@ model Expense {
   id          String   @id @default(cuid())
   title       String   
   amount      Float
+  category    String   @default("Allgemein") // NEU: Für das Tortendiagramm
   date        DateTime @default(now())
   userId      String
   user        User     @relation("UserExpenses", fields: [userId], references: [id])
@@ -65,9 +66,9 @@ model ShoppingItem {
   id           String   @id @default(cuid())
   title        String
   checked      Boolean  @default(false)
-  amount       Float?   // NEU: Die zu kaufende/gekaufte Menge
-  unit         String?  // NEU: Die Einheit (z.B. Liter, Packung)
-  pantryItemId String?  // NEU: Verknüpfung zum Vorratsschrank
+  amount       Float?   
+  unit         String?  
+  pantryItemId String?  
   createdAt    DateTime @default(now())
 }
 

@@ -20,7 +20,7 @@ import {
   Map, Heart, Lock, BookOpen, Calendar,
   Cat, CheckCircle2, TrendingUp, PiggyBank, ClipboardList,
   Plus, X, Check, Camera, MessageSquare, Zap, Phone, Timer, Star,
-  Trash2, ThumbsUp, ChevronDown, Settings, Maximize2, Clock, AlertTriangle
+  Trash2, ThumbsUp, ChevronDown, Settings, Maximize2, Clock, AlertTriangle, PieChart
 } from "lucide-react";
 
 // --- HILFSFUNKTIONEN ---
@@ -62,7 +62,6 @@ export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) redirect("/login");
 
-  // --- DATEN PARALLEL ABRUFEN (TURBO MODE) ---
   const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   const todayZero = new Date(new Date().setHours(0,0,0,0));
 
@@ -87,21 +86,18 @@ export default async function DashboardPage() {
     prisma.timelineEvent.findMany({ where: { date: { gte: todayZero } }, orderBy: { date: 'asc' }, take: 3 }),
     prisma.expense.findMany({ where: { date: { gte: startOfMonth } }, include: { user: true }, orderBy: { date: 'desc' } }),
     prisma.bucketItem.findMany({ include: { creator: true, approver: true }, orderBy: { createdAt: 'desc' } }),
-    prisma.petHealthEvent.findMany({ orderBy: { dueDate: 'asc' } }) // Püppi Health Events hinzugefügt
+    prisma.petHealthEvent.findMany({ orderBy: { dueDate: 'asc' } })
   ]);
 
   const currentUser = allUsers.find(u => u.email === session.user?.email);
   const partner = allUsers.find(u => u.email !== session.user?.email);
 
-  // Fallbacks verarbeiten
   let petFood = petFoodResult;
   if (!petFood) petFood = await prisma.petFood.create({ data: { cans: 10 } });
 
   let energySettings = energySettingsResult;
   if (!energySettings) energySettings = await prisma.energySettings.create({ data: { kwhPrice: 0.35, monthlyPrepayment: 80 } });
 
-
-  // --- MATHEMATIK & LOGIK ---
   const myIncome = currentUser?.netIncome || 0;
   const partnerIncome = partner?.netIncome || 0;
   const totalIncome = myIncome + partnerIncome;
@@ -132,7 +128,6 @@ export default async function DashboardPage() {
   const litter2Status = getHygieneStatus(lastCleanBox2?.createdAt);
   const overallPueppiStatus = Math.max(foodStatusLevel, litter1Status.level, litter2Status.level);
 
-  // --- ENERGY MATH ---
   let energyForecast = null;
   let energyDifference = 0;
   if (energyReadings.length >= 2) {
@@ -151,6 +146,7 @@ export default async function DashboardPage() {
   const displayReadings = [...energyReadings].reverse().slice(0, 5);
 
   const apps = [
+    { title: "Statistik", icon: <PieChart size={24} />, href: "/statistics", color: "bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-500/20 dark:text-fuchsia-500" },
     { title: "Smart Home", icon: <LayoutDashboard size={24} />, href: "/smarthome", color: "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-500" },
     { title: "Abos", icon: <TrendingUp size={24} />, href: "/subscriptions", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-500" },
     { title: "Shopping", icon: <ShoppingCart size={24} />, href: "/shopping", badge: openShoppingItemsCount, color: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-500" },
@@ -180,7 +176,6 @@ export default async function DashboardPage() {
 
       <main className="max-w-6xl mx-auto px-4 md:px-8 mt-6 space-y-8">
         
-        {/* RECAP, COUNTDOWN & DEMNÄCHST ROW */}
         <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 p-6 rounded-[2.5rem] flex flex-col justify-center transition-colors">
             <div className="flex items-center justify-between mb-2">
@@ -231,7 +226,6 @@ export default async function DashboardPage() {
           </div>
         </section>
 
-        {/* APP DRAWER */}
         <section className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-12 gap-y-6 gap-x-2">
           {apps.map((app) => (
             <Link key={app.title} href={app.href} className="group flex flex-col items-center gap-2 relative">
@@ -244,7 +238,6 @@ export default async function DashboardPage() {
           ))}
         </section>
 
-        {/* FINANCE BENTO */}
         <section className="grid grid-cols-1 md:grid-cols-12 gap-4">
           <div className="md:col-span-7 lg:col-span-8 bg-stone-900 text-white p-8 rounded-[2.5rem] shadow-xl relative overflow-hidden flex flex-col justify-between min-h-[220px] transition-colors">
             <div className="relative z-10">
@@ -267,10 +260,7 @@ export default async function DashboardPage() {
                 </div>
               </div>
 
-              {/* FIXKOSTEN & VARIABLE AUSGABEN (ALLTAG) */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* FIXKOSTEN */}
                 <div className="space-y-4">
                   <p className="text-[10px] uppercase font-bold text-stone-500 border-b border-stone-800 pb-2">Monatliche Fixkosten</p>
                   <div className="space-y-2 max-h-40 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-stone-800">
@@ -293,7 +283,6 @@ export default async function DashboardPage() {
                   </form>
                 </div>
 
-                {/* VARIABLE AUSGABEN (ALLTAG) EINGEFÜGT */}
                 <div className="space-y-4">
                   <p className="text-[10px] uppercase font-bold text-stone-500 border-b border-stone-800 pb-2">Alltag (Dieser Monat)</p>
                   <div className="space-y-2 max-h-40 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-stone-800">
@@ -309,13 +298,20 @@ export default async function DashboardPage() {
                        </div>
                      ))}
                   </div>
-                  <form action={async (formData) => { "use server"; await addExpense(formData.get("title") as string, parseFloat(formData.get("amount") as string)); }} className="flex gap-2">
+                  {/* NEU: Dropdown für Kategorie hinzugefügt */}
+                  <form action={async (formData) => { "use server"; await addExpense(formData.get("title") as string, parseFloat(formData.get("amount") as string), formData.get("category") as string); }} className="flex flex-wrap gap-2">
                      <input name="title" placeholder="Tanken, Rewe..." className="flex-1 bg-stone-800 border-none text-[10px] px-3 py-2 rounded-xl outline-none focus:ring-1 focus:ring-[#C5A38E]" required />
+                     <select name="category" className="w-24 bg-stone-800 border-none text-[10px] px-2 py-2 rounded-xl outline-none focus:ring-1 focus:ring-[#C5A38E]" required>
+                       <option value="Lebensmittel">Essen</option>
+                       <option value="Auto">Auto</option>
+                       <option value="Haushalt">Haus</option>
+                       <option value="Freizeit">Freizeit</option>
+                       <option value="Allgemein">Allgemein</option>
+                     </select>
                      <input name="amount" type="number" step="0.01" placeholder="€" className="w-16 bg-stone-800 border-none text-[10px] px-3 py-2 rounded-xl outline-none focus:ring-1 focus:ring-[#C5A38E]" required />
                      <button className="bg-[#C5A38E] text-stone-900 px-3 py-2 rounded-xl text-[10px] font-bold hover:bg-[#A38572] transition-colors">+</button>
                   </form>
                 </div>
-
               </div>
             </div>
           </div>
@@ -345,7 +341,6 @@ export default async function DashboardPage() {
           </div>
         </section>
 
-        {/* SINKING FUNDS / WÜNSCHE */}
         <section className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-[2.5rem] p-6 md:p-8 shadow-sm transition-colors">
           <div className="flex items-center gap-2 mb-6">
             <PiggyBank size={20} className="text-[#C5A38E]" />
@@ -435,10 +430,7 @@ export default async function DashboardPage() {
           </div>
         </section>
 
-        {/* OPERATION MODULES GRID */}
         <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          
-          {/* VORRATSSCHRANK */}
           <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-[2.5rem] p-6 shadow-sm flex flex-col h-[450px] transition-colors">
             <div className="flex items-center gap-2 mb-4">
               <ShoppingCart size={18} className="text-[#C5A38E]" />
@@ -483,7 +475,6 @@ export default async function DashboardPage() {
             </form>
           </div>
 
-          {/* ENERGY RADAR WITH MATH */}
           <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-[2.5rem] p-6 shadow-sm flex flex-col justify-between transition-colors">
             <div>
               <div className="flex items-center justify-between mb-4">
@@ -510,7 +501,6 @@ export default async function DashboardPage() {
                 </details>
               </div>
 
-              {/* NACHZAHLUNG ODER RÜCKZAHLUNG ANZEIGE */}
               {energyForecast ? (
                 <div className={`p-3 rounded-2xl mb-4 border ${energyDifference >= 0 ? 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-900/20' : 'bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-900/20'}`}>
                   <p className="text-[10px] uppercase font-bold tracking-widest opacity-70">Jahresprognose</p>
@@ -541,7 +531,6 @@ export default async function DashboardPage() {
             </form>
           </div>
 
-          {/* SHARED CONTACTS */}
           <div className="bg-stone-900 text-white rounded-[2.5rem] p-6 shadow-xl flex flex-col h-[400px] transition-colors">
             <div className="flex items-center gap-2 mb-4 text-[#C5A38E]">
               <Phone size={18} />
@@ -581,10 +570,8 @@ export default async function DashboardPage() {
 
         </section>
 
-        {/* SOCIAL & CARE ROW */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           
-          {/* SCHWARZES BRETT MIT BILDER-MODAL */}
           <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-[2.5rem] p-6 shadow-sm flex flex-col h-[500px] transition-colors">
             <div className="flex items-center gap-2 mb-4">
               <MessageSquare size={18} className="text-[#C5A38E]" />
@@ -626,7 +613,6 @@ export default async function DashboardPage() {
             </form>
           </div>
 
-          {/* PÜPPI CARES (Mit Health Events) */}
           <div className="bg-stone-900 text-white rounded-[2.5rem] p-8 shadow-2xl flex flex-col justify-between overflow-hidden relative transition-colors duration-500" 
                style={{ boxShadow: overallPueppiStatus === 3 ? '0 0 40px -5px rgba(239, 68, 68, 0.3)' : overallPueppiStatus === 2 ? '0 0 30px -5px rgba(245, 158, 11, 0.2)' : '0 10px 30px -10px rgba(0,0,0,0.5)' }}>
             
@@ -668,7 +654,6 @@ export default async function DashboardPage() {
               </div>
             </div>
 
-            {/* NEU: HEALTH EVENTS */}
             <div className="bg-stone-800/50 rounded-2xl p-4 mb-6 relative z-10 border border-stone-700/50">
               <p className="text-[10px] uppercase font-bold text-stone-500 mb-2">Gesundheit & Termine</p>
               <div className="space-y-2 mb-3">
@@ -700,7 +685,6 @@ export default async function DashboardPage() {
 
       </main>
       
-      {/* IOS DYNAMIC BAR */}
       <div className="fixed bottom-6 left-0 right-0 px-4 pointer-events-none z-50 flex justify-center">
         <form action={async (formData) => { 
           "use server"; 
@@ -710,7 +694,6 @@ export default async function DashboardPage() {
             <input name="title" placeholder="Wunsch hinzufügen..." className="flex-1 h-12 bg-stone-100/50 dark:bg-black/20 px-5 rounded-2xl outline-none text-sm focus:border-[#C5A38E] border border-transparent transition" required />
             <input name="price" type="number" placeholder="€" className="w-16 h-12 bg-stone-100/50 dark:bg-black/20 rounded-2xl outline-none text-center text-sm focus:border-[#C5A38E] border border-transparent transition" />
             
-            {/* SURPRISE CHECKBOX */}
             <label className="flex flex-col items-center justify-center w-12 h-12 bg-stone-100/50 dark:bg-black/20 rounded-2xl cursor-pointer hover:bg-black/30 transition-colors">
               <input type="checkbox" name="isSurprise" className="w-4 h-4 accent-[#C5A38E]" />
               <span className="text-[8px] uppercase mt-1 text-stone-500 font-bold">Geheim</span>

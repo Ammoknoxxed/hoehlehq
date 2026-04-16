@@ -139,23 +139,62 @@ export async function deleteExpense(id: string) {
   revalidatePath("/");
 }
 
-export async function addShoppingItem(title: string) {
+// --- EINKAUFSLISTE NEU (Menge & Verknüpfung) ---
+export async function addShoppingItem(title: string, amount?: number, unit?: string) {
   await requireAuth();
-  await prisma.shoppingItem.create({ data: { title } });
+  
+  // Smart Feature: Prüfen, ob das manuell eingetippte Wort im Vorratsschrank existiert
+  const pantryItem = await prisma.pantryItem.findFirst({
+    where: { name: { equals: title, mode: 'insensitive' } }
+  });
+
+  await prisma.shoppingItem.create({ 
+    data: { 
+      title,
+      amount: amount || null,
+      unit: unit || pantryItem?.unit || null,
+      pantryItemId: pantryItem?.id || null 
+    } 
+  });
   revalidatePath("/shopping");
 }
 
-export async function toggleShoppingItem(id: string, checked: boolean) {
+export async function toggleShoppingItem(id: string, checked: boolean, amount?: number) {
   await requireAuth();
-  await prisma.shoppingItem.update({ where: { id }, data: { checked } });
+  await prisma.shoppingItem.update({ 
+    where: { id }, 
+    data: { 
+      checked,
+      // Wenn eine Menge übergeben wurde, updaten wir sie direkt im Shopping Item
+      ...(amount !== undefined && !isNaN(amount) ? { amount } : {})
+    } 
+  });
   revalidatePath("/shopping");
 }
 
 export async function clearShoppingList() {
   await requireAuth();
+  // Vor dem Löschen: Vorratsschrank mit gekauften Mengen auffüllen!
+  const completed = await prisma.shoppingItem.findMany({ where: { checked: true } });
+  
+  for (const item of completed) {
+    if (item.pantryItemId && item.amount) {
+      const pantryItem = await prisma.pantryItem.findUnique({ where: { id: item.pantryItemId } });
+      if (pantryItem) {
+        await prisma.pantryItem.update({
+          where: { id: pantryItem.id },
+          data: { count: pantryItem.count + item.amount }
+        });
+      }
+    }
+  }
+
+  // Dann die Liste leeren
   await prisma.shoppingItem.deleteMany({ where: { checked: true } });
   revalidatePath("/shopping");
+  revalidatePath("/"); // Update auch das Dashboard (Vorratsschrank)
 }
+// ----------------------------------------------
 
 export async function addWikiEntry(title: string, content: string, category: string) {
   const { user } = await requireAuth();
@@ -555,7 +594,7 @@ export async function deleteHealthEvent(id: string) {
   revalidatePath("/");
 }
 
-// --- VORRATSSCHRANK (NEU MIT DIRECT SET UND UNIT) ---
+// --- VORRATSSCHRANK (Angepasst mit Verknüpfung) ---
 export async function setPantryCount(id: string, count: number) {
   const item = await prisma.pantryItem.findUnique({ where: { id } });
   if (!item) return;
@@ -566,10 +605,17 @@ export async function setPantryCount(id: string, count: number) {
     data: { count: newCount }
   });
 
-  if (newCount <= item.minCount) {
-    const existing = await prisma.shoppingItem.findFirst({ where: { title: { contains: item.name }, checked: false } });
+  if (newCount < item.minCount) {
+    // Verknüpfe das ShoppingItem nun direkt mit der pantryItemId
+    const existing = await prisma.shoppingItem.findFirst({ where: { pantryItemId: item.id, checked: false } });
     if (!existing) {
-      await prisma.shoppingItem.create({ data: { title: `🛒 Vorrat leer: ${item.name}` } });
+      await prisma.shoppingItem.create({ 
+        data: { 
+          title: item.name,
+          pantryItemId: item.id,
+          unit: item.unit
+        } 
+      });
     }
   }
   revalidatePath("/");

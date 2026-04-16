@@ -62,10 +62,13 @@ model Expense {
 }
 
 model ShoppingItem {
-  id        String   @id @default(cuid())
-  title     String
-  checked   Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  title        String
+  checked      Boolean  @default(false)
+  amount       Float?   // NEU: Die zu kaufende/gekaufte Menge
+  unit         String?  // NEU: Die Einheit (z.B. Liter, Packung)
+  pantryItemId String?  // NEU: Verknüpfung zum Vorratsschrank
+  createdAt    DateTime @default(now())
 }
 
 model Chore {

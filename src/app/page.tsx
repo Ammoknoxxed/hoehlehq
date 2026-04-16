@@ -452,7 +452,7 @@ export default async function DashboardPage() {
                       <button className="opacity-0 group-hover:opacity-100 text-stone-400 hover:text-rose-500 transition-all"><Trash2 size={12}/></button>
                     </form>
                     <div className="flex flex-col">
-                      <span className={`text-sm ${item.count <= item.minCount ? 'text-rose-500 font-bold animate-pulse' : ''}`}>{item.name}</span>
+                      <span className={`text-sm ${item.count < item.minCount ? 'text-rose-500 font-bold animate-pulse' : ''}`}>{item.name}</span>
                       <span className="text-[9px] text-stone-400 uppercase">Min: {item.minCount} {item.unit}</span>
                     </div>
                   </div>

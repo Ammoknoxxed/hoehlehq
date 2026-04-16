@@ -38,7 +38,7 @@ export default function StatCharts({ expenses, energy }: { expenses: any[], ener
                   ))}
                 </Pie>
                 <Tooltip 
-                  formatter={(value: number) => `€ ${value.toFixed(2)}`}
+                  formatter={(value: any) => `€ ${Number(value).toFixed(2)}`}
                   contentStyle={{ borderRadius: '1rem', border: 'none', backgroundColor: '#1C1917', color: '#fff' }}
                 />
               </PieChart>

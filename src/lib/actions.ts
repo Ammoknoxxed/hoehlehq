@@ -553,3 +553,58 @@ export async function deleteSharedContact(id: string) {
   await prisma.sharedContact.delete({ where: { id } });
   revalidatePath("/");
 }
+
+// --- ERWEITERTE SMART HOME STEUERUNG (GOVEE & SAMSUNG TV) ---
+export async function setGoveeDeviceState(id: string, cmdName: "color" | "brightness", value: any) {
+  await requireAuth();
+  const device = await prisma.smartDevice.findUnique({ where: { id } });
+  if (!device || !device.externalId || !device.modelCode) return;
+
+  const GOVEE_KEY = process.env.GOVEE_API_KEY;
+  if (!GOVEE_KEY) return;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    await fetch('https://developer-api.govee.com/v1/devices/control', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Govee-API-Key': GOVEE_KEY },
+      body: JSON.stringify({
+        device: device.externalId,
+        model: device.modelCode,
+        cmd: { name: cmdName, value: value }
+      }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    revalidatePath("/smarthome");
+  } catch (error) {
+    console.error("Govee Control Error:", error);
+  }
+}
+
+export async function sendTvCommand(id: string, capability: string, command: string, args: any[] = []) {
+  await requireAuth();
+  const device = await prisma.smartDevice.findUnique({ where: { id } });
+  if (!device || !device.externalId) return;
+
+  const ST_TOKEN = process.env.SMARTTHINGS_TOKEN;
+  if (!ST_TOKEN) return;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    await fetch(`https://api.smartthings.com/v1/devices/${device.externalId}/commands`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${ST_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        commands: [{ component: "main", capability: capability, command: command, arguments: args }]
+      }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    revalidatePath("/smarthome");
+  } catch (error) {
+    console.error("Samsung Control Error:", error);
+  }
+}

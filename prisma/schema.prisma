@@ -72,7 +72,7 @@ model Chore {
   id          String   @id @default(cuid())
   title       String
   points      Int      @default(10)
-  lastDoneBy  String?  
+  lastDoneBy  String?
   lastDoneAt  DateTime?
   createdAt   DateTime @default(now())
 }
@@ -176,10 +176,24 @@ model SmartDevice {
   externalId  String?  // MAC Adresse oder Samsung Device ID
   modelCode   String?  // z.B. H618F
   isActive    Boolean  @default(false)
-  value       String?  
+  value       String?
   room        String   @default("Wohnzimmer")
   addedBy     String
   createdAt   DateTime @default(now())
+}
+
+model StickyNote {
+  id        String   @id @default(cuid())
+  text      String?
+  imageUrl  String?
+  author    String
+  createdAt DateTime @default(now())
+}
+
+model PetFood {
+  id        String   @id @default(cuid())
+  cans      Int      @default(10)
+  updatedAt DateTime @updatedAt
 }
 
 model LitterBoxLog {

@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { writeFile } from "fs/promises";
+import { writeFile, mkdir } from "fs/promises"; // mkdir hinzugefügt
 import { join } from "path";
 
 // --- HILFSFUNKTION: SECURITY CHECK ---
@@ -27,9 +27,17 @@ export async function uploadImage(formData: FormData) {
   const buffer = Buffer.from(bytes);
   
   const filename = `${Date.now()}-${file.name.replace(/\s/g, '_')}`;
-  const path = join(process.cwd(), "public/uploads", filename);
   
-  await writeFile(path, buffer);
+  // Absoluten Pfad definieren
+  const uploadDir = join(process.cwd(), "public/uploads");
+  const filepath = join(uploadDir, filename);
+  
+  // WICHTIG: Erstellt den Ordner, falls er nicht existiert
+  await mkdir(uploadDir, { recursive: true });
+  
+  // Bild abspeichern
+  await writeFile(filepath, buffer);
+  
   return `/uploads/${filename}`;
 }
 

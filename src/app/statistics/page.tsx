@@ -11,21 +11,22 @@ export default async function StatisticsPage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
 
-  // Alle Daten parallel laden (inkl. User für Einkommen und Obligations für Fixkosten)
-  const [expenses, energyReadings, chores, bucketItems, users, obligations] = await Promise.all([
-    prisma.expense.findMany({ orderBy: { date: 'asc' } }),
-    prisma.energyReading.findMany({ orderBy: { date: 'asc' } }),
-    prisma.chore.findMany(),
-    prisma.bucketItem.findMany(),
+  // Harter Filter: Wir ignorieren alle Testdaten vor Mai 2026!
+  const statsStartDate = new Date("2026-05-01T00:00:00.000Z");
+
+  const [expenses, energyReadings, chores, bucketItems, users, obligations, incomes] = await Promise.all([
+    prisma.expense.findMany({ where: { date: { gte: statsStartDate } }, orderBy: { date: 'asc' } }),
+    prisma.energyReading.findMany({ where: { date: { gte: statsStartDate } }, orderBy: { date: 'asc' } }),
+    prisma.chore.findMany({ where: { lastDoneAt: { gte: statsStartDate } } }),
+    prisma.bucketItem.findMany(), // Sinking Funds behalten wir All-Time
     prisma.user.findMany(),
-    prisma.financialObligation.findMany()
+    prisma.financialObligation.findMany(),
+    prisma.income.findMany({ where: { date: { gte: statsStartDate } }, orderBy: { date: 'asc' } })
   ]);
 
   const totalSaved = bucketItems.reduce((sum, item) => sum + item.savedAmount, 0);
   const totalWishes = bucketItems.reduce((sum, item) => sum + item.price, 0);
   
-  // Gemeinsames Einkommen und gemeinsame Fixkosten berechnen
-  const totalIncome = users.reduce((sum, u) => sum + u.netIncome, 0);
   const totalFixed = obligations.reduce((sum, ob) => sum + ob.amount, 0);
 
   return (
@@ -40,7 +41,6 @@ export default async function StatisticsPage() {
           <ThemeToggle />
         </header>
 
-        {/* Kurze Übersichtzahlen */}
         <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
            <div className="bg-stone-900 text-white p-6 rounded-3xl">
              <p className="text-[10px] text-stone-400 uppercase tracking-widest font-bold">Gesparte Sinking Funds</p>
@@ -50,15 +50,14 @@ export default async function StatisticsPage() {
            <div className="bg-stone-900 text-white p-6 rounded-3xl">
              <p className="text-[10px] text-stone-400 uppercase tracking-widest font-bold">Erledigte Aufgaben (Putzplan)</p>
              <p className="text-2xl font-light mt-2">{chores.filter(c => c.lastDoneAt !== null).length}</p>
-             <p className="text-[9px] text-stone-500 mt-1">All-Time Historie</p>
+             <p className="text-[9px] text-stone-500 mt-1">Seit Mai 2026</p>
            </div>
         </section>
 
-        {/* Interaktive Diagramme (Client Component) */}
         <StatCharts 
           expenses={expenses} 
           energy={energyReadings} 
-          totalIncome={totalIncome} 
+          incomes={incomes}
           totalFixed={totalFixed} 
         />
 

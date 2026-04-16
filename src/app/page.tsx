@@ -549,7 +549,7 @@ export default async function DashboardPage() {
               {/* Klo 1 Card */}
               <div className={`p-4 rounded-2xl border transition-colors ${getHygieneStatus(lastCleanBox1?.createdAt).bg}`}>
                 <div className="flex justify-between items-center mb-1.5">
-                    <span className="text-xs font-bold uppercase tracking-wider text-stone-700 dark:text-stone-300">Haupt-Klo</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-stone-700 dark:text-stone-300">Toilette Wohnzimmer</span>
                     <form action={async () => { "use server"; await cleanLitterBox(1); }}>
                         <button className="h-9 w-9 bg-black/20 hover:bg-black/40 rounded-full flex items-center justify-center transition-colors text-white font-bold">✓</button>
                     </form>
@@ -559,7 +559,7 @@ export default async function DashboardPage() {
               {/* Klo 2 Card */}
               <div className={`p-4 rounded-2xl border transition-colors ${getHygieneStatus(lastCleanBox2?.createdAt).bg}`}>
                 <div className="flex justify-between items-center mb-1.5">
-                    <span className="text-xs font-bold uppercase tracking-wider text-stone-700 dark:text-stone-300">Zweit-Klo</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-stone-700 dark:text-stone-300">Toilette Püppizimmer</span>
                     <form action={async () => { "use server"; await cleanLitterBox(2); }}>
                         <button className="h-9 w-9 bg-black/20 hover:bg-black/40 rounded-full flex items-center justify-center transition-colors text-white font-bold">✓</button>
                     </form>

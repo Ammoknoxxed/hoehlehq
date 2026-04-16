@@ -88,7 +88,6 @@ export default async function DashboardPage() {
     prisma.bucketItem.findMany({ include: { creator: true, approver: true }, orderBy: { createdAt: 'desc' } }),
     prisma.petHealthEvent.findMany({ orderBy: { dueDate: 'asc' } }),
     
-    // Performance Aggregations für den All-Time Kontostand
     prisma.expense.aggregate({ _sum: { amount: true } }),
     prisma.income.aggregate({ _sum: { amount: true } }),
     prisma.trip.aggregate({ _sum: { savedAmount: true } }),
@@ -101,9 +100,8 @@ export default async function DashboardPage() {
   let petFood = petFoodResult || await prisma.petFood.create({ data: { cans: 10 } });
   let energySettings = energySettingsResult || await prisma.energySettings.create({ data: { kwhPrice: 0.35, monthlyPrepayment: 80 } });
 
-  // --- DIE ECHTE KONTOSTAND-MATHE (LEDGER) ---
   const startYear = 2026;
-  const startMonth = 3; // April (0-indexed)
+  const startMonth = 3; 
   const now = new Date();
   const monthsActive = (now.getFullYear() - startYear) * 12 + (now.getMonth() - startMonth) + 1;
 
@@ -115,14 +113,11 @@ export default async function DashboardPage() {
   const totalBucketSavings = allItems.reduce((sum, i) => sum + i.savedAmount, 0);
   const totalTripSavings = tripAgg._sum.savedAmount || 0;
 
-  // Der ungeschönte Saldo inkl. Überträge aus Vormonaten!
   const realBalance = totalIncomeAllTime - totalVariableAllTime - totalFixedAllTime - totalBucketSavings - totalTripSavings;
 
-  // Werte für die "Diesen Monat" Box
   const currentMonthIncomeVal = currentMonthIncomes.reduce((sum, inc) => sum + inc.amount, 0);
   const currentMonthVariableVal = currentMonthExpenses.reduce((sum, ex) => sum + ex.amount, 0);
 
-  // --- Fair Share & Recaps ---
   const expectedTotalIncome = (currentUser?.netIncome || 0) + (partner?.netIncome || 0);
   const mySharePct = expectedTotalIncome > 0 ? ((currentUser?.netIncome || 0) / expectedTotalIncome) : 0.5;
   const partnerSharePct = 1 - mySharePct;
@@ -256,11 +251,11 @@ export default async function DashboardPage() {
           ))}
         </section>
 
-        {/* FINANCE BENTO (NEU: DAS BANK-MODELL) */}
+        {/* FINANCE BENTO: HEADER (KONTOSTAND & FAIR SHARE) */}
         <section className="grid grid-cols-1 md:grid-cols-12 gap-4">
-          <div className="md:col-span-7 lg:col-span-8 bg-stone-900 text-white p-8 rounded-[2.5rem] shadow-xl relative overflow-hidden flex flex-col justify-between min-h-[220px] transition-colors">
+          <div className="md:col-span-7 lg:col-span-8 bg-stone-900 text-white p-8 rounded-[2.5rem] shadow-xl relative overflow-hidden flex flex-col justify-center min-h-[220px] transition-colors">
             
-            <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+            <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
               <div>
                 <p className="text-xs uppercase tracking-widest font-bold text-stone-500 mb-2 flex items-center gap-2">
                   <Wallet size={14} /> Echter Kontostand
@@ -272,101 +267,23 @@ export default async function DashboardPage() {
               </div>
               
               {/* Zusammenfassung diesen Monat */}
-              <div className="bg-stone-800/50 p-4 rounded-2xl border border-stone-700/50 text-right w-full md:w-auto">
-                 <p className="text-[10px] uppercase font-bold text-stone-400 mb-1">Diesen Monat ({new Date().toLocaleDateString('de-DE', { month: 'long' })})</p>
-                 <p className="text-sm font-medium text-emerald-400">+ € {currentMonthIncomeVal.toLocaleString('de-DE', { maximumFractionDigits: 0 })} Einnahmen</p>
+              <div className="bg-stone-800/50 p-5 rounded-3xl border border-stone-700/50 text-right w-full md:w-auto shadow-inner">
+                 <p className="text-[10px] uppercase font-bold text-stone-400 mb-2">Diesen Monat ({new Date().toLocaleDateString('de-DE', { month: 'long' })})</p>
+                 <p className="text-sm font-medium text-emerald-400 mb-1">+ € {currentMonthIncomeVal.toLocaleString('de-DE', { maximumFractionDigits: 0 })} Einnahmen</p>
                  <p className="text-sm font-medium text-rose-400">- € {(totalFixedMonthly + currentMonthVariableVal).toLocaleString('de-DE', { maximumFractionDigits: 0 })} Ausgaben</p>
-                 <div className="h-[1px] w-full bg-stone-700 my-1"></div>
+                 <div className="h-[1px] w-full bg-stone-700 my-2"></div>
                  <p className={`text-sm font-bold ${currentMonthIncomeVal - (totalFixedMonthly + currentMonthVariableVal) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                    = € {(currentMonthIncomeVal - (totalFixedMonthly + currentMonthVariableVal)).toLocaleString('de-DE', { maximumFractionDigits: 0 })}
                  </p>
               </div>
             </div>
             
-            {/* DAS 3-SPALTEN LEDGER */}
-            <div className="relative z-10 mt-6 pt-6 border-t border-stone-800">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                
-                {/* 1. EINNAHMEN */}
-                <div className="space-y-4">
-                  <p className="text-[10px] uppercase font-bold text-stone-500 border-b border-stone-800 pb-2">Geldeingang</p>
-                  <div className="space-y-2 max-h-40 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-stone-800">
-                     {currentMonthIncomes.length === 0 && <p className="text-[10px] text-stone-600 italic">Noch nichts eingegangen.</p>}
-                     {currentMonthIncomes.map(inc => (
-                       <div key={inc.id} className="flex justify-between items-center text-[11px] text-stone-400 group">
-                          <span className="truncate max-w-[100px]">{inc.title}</span>
-                          <div className="flex items-center gap-2">
-                             <span className="tabular-nums text-emerald-400">+€{inc.amount.toFixed(0)}</span>
-                             <form action={async () => { "use server"; await deleteIncome(inc.id); }}><button className="opacity-0 group-hover:opacity-100 text-rose-500 transition-all"><X size={12}/></button></form>
-                          </div>
-                       </div>
-                     ))}
-                  </div>
-                  <form action={async (formData) => { "use server"; await addIncome(formData.get("title") as string, parseFloat(formData.get("amount") as string)); }} className="flex gap-2">
-                     <input name="title" placeholder="Gehalt..." className="flex-1 bg-stone-800 border-none text-[10px] px-3 py-2 rounded-xl outline-none focus:ring-1 focus:ring-emerald-500" required />
-                     <input name="amount" type="number" step="0.01" placeholder="€" className="w-16 bg-stone-800 border-none text-[10px] px-3 py-2 rounded-xl outline-none focus:ring-1 focus:ring-emerald-500" required />
-                     <button className="bg-emerald-600 text-stone-900 px-3 py-2 rounded-xl text-[10px] font-bold hover:bg-emerald-500 transition-colors">+</button>
-                  </form>
-                </div>
-
-                {/* 2. FIXKOSTEN */}
-                <div className="space-y-4">
-                  <p className="text-[10px] uppercase font-bold text-stone-500 border-b border-stone-800 pb-2">Fixkosten Liste</p>
-                  <div className="space-y-2 max-h-40 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-stone-800">
-                     {obligations.map(ob => (
-                       <div key={ob.id} className="flex justify-between items-center text-[11px] text-stone-400 group">
-                          <span className="truncate max-w-[100px]">{ob.title}</span>
-                          <div className="flex items-center gap-2">
-                             <span className="tabular-nums">€ {ob.amount.toFixed(0)}</span>
-                             <form action={async () => { "use server"; await deleteObligation(ob.id); }}><button className="opacity-0 group-hover:opacity-100 text-stone-600 hover:text-rose-500 transition-all"><X size={12}/></button></form>
-                          </div>
-                       </div>
-                     ))}
-                  </div>
-                  <form action={async (formData) => { "use server"; await addObligation(formData.get("title") as string, parseFloat(formData.get("amount") as string)); }} className="flex gap-2">
-                     <input name="title" placeholder="Miete, Strom..." className="flex-1 bg-stone-800 border-none text-[10px] px-3 py-2 rounded-xl outline-none focus:ring-1 focus:ring-[#C5A38E]" required />
-                     <input name="amount" type="number" step="0.01" placeholder="€" className="w-16 bg-stone-800 border-none text-[10px] px-3 py-2 rounded-xl outline-none focus:ring-1 focus:ring-[#C5A38E]" required />
-                     <button className="bg-[#C5A38E] text-stone-900 px-3 py-2 rounded-xl text-[10px] font-bold hover:bg-[#A38572] transition-colors">+</button>
-                  </form>
-                </div>
-
-                {/* 3. ALLTAG */}
-                <div className="space-y-4">
-                  <p className="text-[10px] uppercase font-bold text-stone-500 border-b border-stone-800 pb-2">Alltag Ausgaben</p>
-                  <div className="space-y-2 max-h-40 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-stone-800">
-                     {currentMonthExpenses.map(ex => (
-                       <div key={ex.id} className="flex justify-between items-center text-[11px] text-stone-400 group">
-                          <span className="truncate max-w-[100px]">{ex.title}</span>
-                          <div className="flex items-center gap-2">
-                             <span className="tabular-nums">€ {ex.amount.toFixed(0)}</span>
-                             <form action={async () => { "use server"; await deleteExpense(ex.id); }}><button className="opacity-0 group-hover:opacity-100 text-stone-600 hover:text-rose-500 transition-all"><X size={12}/></button></form>
-                          </div>
-                       </div>
-                     ))}
-                  </div>
-                  <form action={async (formData) => { "use server"; await addExpense(formData.get("title") as string, parseFloat(formData.get("amount") as string), formData.get("category") as string); }} className="flex flex-wrap gap-2">
-                     <input name="title" placeholder="Tanken, Rewe..." className="flex-1 bg-stone-800 border-none text-[10px] px-3 py-2 rounded-xl outline-none focus:ring-1 focus:ring-[#C5A38E]" required />
-                     <select name="category" className="w-20 bg-stone-800 border-none text-[10px] px-2 py-2 rounded-xl outline-none focus:ring-1 focus:ring-[#C5A38E]" required>
-                       <option value="Lebensmittel">Essen</option>
-                       <option value="Auto">Auto</option>
-                       <option value="Haushalt">Haus</option>
-                       <option value="Freizeit">Freizeit</option>
-                       <option value="Allgemein">Allgemein</option>
-                     </select>
-                     <input name="amount" type="number" step="0.01" placeholder="€" className="w-16 bg-stone-800 border-none text-[10px] px-3 py-2 rounded-xl outline-none focus:ring-1 focus:ring-[#C5A38E]" required />
-                     <button className="bg-[#C5A38E] text-stone-900 px-3 py-2 rounded-xl text-[10px] font-bold hover:bg-[#A38572] transition-colors">+</button>
-                  </form>
-                </div>
-
-              </div>
-            </div>
           </div>
 
           <div className="md:col-span-5 lg:col-span-4 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 p-8 rounded-[2.5rem] shadow-sm flex flex-col justify-center gap-6 transition-colors">
             <div className="flex items-center justify-between mb-4 border-b border-stone-100 dark:border-stone-800 pb-4">
               <h3 className="text-xs font-bold text-stone-400 uppercase tracking-widest">Fair Share Split</h3>
               
-              {/* EINKOMMEN ANPASSEN (WICHTIG FÜR PROZENTE!) */}
               <details className="relative group">
                 <summary className="text-[10px] text-stone-500 font-bold uppercase cursor-pointer list-none hover:text-[#C5A38E] transition-colors">Gehälter (Basis)</summary>
                 <div className="absolute right-0 top-6 bg-stone-800 p-4 rounded-2xl z-20 shadow-2xl border border-stone-700 w-48">
@@ -400,6 +317,82 @@ export default async function DashboardPage() {
               </div>
             </div>
           </div>
+        </section>
+
+        {/* FINANCE BENTO: DAS 3-SPALTEN LEDGER (VOLLE BREITE, MEHR PLATZ!) */}
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            
+            {/* 1. EINNAHMEN */}
+            <div className="bg-stone-900 text-white p-6 md:p-8 rounded-[2.5rem] shadow-xl flex flex-col transition-colors min-h-[250px]">
+              <p className="text-[10px] uppercase font-bold text-emerald-500/70 border-b border-stone-800 pb-3 mb-4">Geldeingang</p>
+              <div className="flex-1 space-y-2 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-stone-800">
+                  {currentMonthIncomes.length === 0 && <p className="text-[10px] text-stone-600 italic">Noch nichts eingegangen.</p>}
+                  {currentMonthIncomes.map(inc => (
+                    <div key={inc.id} className="flex justify-between items-center text-[11px] text-stone-400 group">
+                      <span className="truncate max-w-[120px]">{inc.title}</span>
+                      <div className="flex items-center gap-2">
+                          <span className="tabular-nums text-emerald-400">+€{inc.amount.toFixed(0)}</span>
+                          <form action={async () => { "use server"; await deleteIncome(inc.id); }}><button className="opacity-0 group-hover:opacity-100 text-rose-500 transition-all"><X size={12}/></button></form>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+              <form action={async (formData) => { "use server"; await addIncome(formData.get("title") as string, parseFloat(formData.get("amount") as string)); }} className="flex flex-wrap xl:flex-nowrap gap-2 mt-4 pt-4 border-t border-stone-800/50">
+                  <input name="title" placeholder="Gehalt..." className="flex-1 min-w-[80px] bg-stone-800 border-none text-[10px] px-3 py-2 rounded-xl outline-none focus:ring-1 focus:ring-emerald-500" required />
+                  <input name="amount" type="number" step="0.01" placeholder="€" className="w-16 bg-stone-800 border-none text-[10px] px-3 py-2 rounded-xl outline-none focus:ring-1 focus:ring-emerald-500" required />
+                  <button className="bg-emerald-600 text-stone-900 px-3 py-2 rounded-xl text-[10px] font-bold hover:bg-emerald-500 transition-colors">+</button>
+              </form>
+            </div>
+
+            {/* 2. FIXKOSTEN */}
+            <div className="bg-stone-900 text-white p-6 md:p-8 rounded-[2.5rem] shadow-xl flex flex-col transition-colors min-h-[250px]">
+              <p className="text-[10px] uppercase font-bold text-stone-500 border-b border-stone-800 pb-3 mb-4">Fixkosten Liste</p>
+              <div className="flex-1 space-y-2 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-stone-800">
+                  {obligations.map(ob => (
+                    <div key={ob.id} className="flex justify-between items-center text-[11px] text-stone-400 group">
+                      <span className="truncate max-w-[120px]">{ob.title}</span>
+                      <div className="flex items-center gap-2">
+                          <span className="tabular-nums">€ {ob.amount.toFixed(0)}</span>
+                          <form action={async () => { "use server"; await deleteObligation(ob.id); }}><button className="opacity-0 group-hover:opacity-100 text-stone-600 hover:text-rose-500 transition-all"><X size={12}/></button></form>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+              <form action={async (formData) => { "use server"; await addObligation(formData.get("title") as string, parseFloat(formData.get("amount") as string)); }} className="flex flex-wrap xl:flex-nowrap gap-2 mt-4 pt-4 border-t border-stone-800/50">
+                  <input name="title" placeholder="Miete, Strom..." className="flex-1 min-w-[80px] bg-stone-800 border-none text-[10px] px-3 py-2 rounded-xl outline-none focus:ring-1 focus:ring-[#C5A38E]" required />
+                  <input name="amount" type="number" step="0.01" placeholder="€" className="w-16 bg-stone-800 border-none text-[10px] px-3 py-2 rounded-xl outline-none focus:ring-1 focus:ring-[#C5A38E]" required />
+                  <button className="bg-[#C5A38E] text-stone-900 px-3 py-2 rounded-xl text-[10px] font-bold hover:bg-[#A38572] transition-colors">+</button>
+              </form>
+            </div>
+
+            {/* 3. ALLTAG */}
+            <div className="bg-stone-900 text-white p-6 md:p-8 rounded-[2.5rem] shadow-xl flex flex-col transition-colors min-h-[250px]">
+              <p className="text-[10px] uppercase font-bold text-[#C5A38E]/70 border-b border-stone-800 pb-3 mb-4">Alltag Ausgaben</p>
+              <div className="flex-1 space-y-2 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-stone-800">
+                  {currentMonthExpenses.map(ex => (
+                    <div key={ex.id} className="flex justify-between items-center text-[11px] text-stone-400 group">
+                      <span className="truncate max-w-[120px]">{ex.title}</span>
+                      <div className="flex items-center gap-2">
+                          <span className="tabular-nums">€ {ex.amount.toFixed(0)}</span>
+                          <form action={async () => { "use server"; await deleteExpense(ex.id); }}><button className="opacity-0 group-hover:opacity-100 text-stone-600 hover:text-rose-500 transition-all"><X size={12}/></button></form>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+              <form action={async (formData) => { "use server"; await addExpense(formData.get("title") as string, parseFloat(formData.get("amount") as string), formData.get("category") as string); }} className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-stone-800/50">
+                  <input name="title" placeholder="Tanken, Rewe..." className="flex-1 min-w-[60px] bg-stone-800 border-none text-[10px] px-3 py-2 rounded-xl outline-none focus:ring-1 focus:ring-[#C5A38E]" required />
+                  <select name="category" className="w-20 bg-stone-800 border-none text-[10px] px-2 py-2 rounded-xl outline-none focus:ring-1 focus:ring-[#C5A38E]" required>
+                    <option value="Lebensmittel">Essen</option>
+                    <option value="Auto">Auto</option>
+                    <option value="Haushalt">Haus</option>
+                    <option value="Freizeit">Freizeit</option>
+                    <option value="Allgemein">Allg.</option>
+                  </select>
+                  <input name="amount" type="number" step="0.01" placeholder="€" className="w-16 bg-stone-800 border-none text-[10px] px-3 py-2 rounded-xl outline-none focus:ring-1 focus:ring-[#C5A38E]" required />
+                  <button className="bg-[#C5A38E] text-stone-900 px-3 py-2 rounded-xl text-[10px] font-bold hover:bg-[#A38572] transition-colors">+</button>
+              </form>
+            </div>
+
         </section>
 
         <section className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-[2.5rem] p-6 md:p-8 shadow-sm transition-colors">

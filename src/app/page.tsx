@@ -70,7 +70,7 @@ export default async function DashboardPage() {
     allUsers, obligations, openShoppingItemsCount, petFoodResult,
     stickyNotes, lastCleanBox1, lastCleanBox2, pantryItems,
     energyReadings, energySettingsResult, contacts, nextTrip,
-    upcomingEvents, expenses, allItems
+    upcomingEvents, expenses, allItems, healthEvents
   ] = await Promise.all([
     prisma.user.findMany(),
     prisma.financialObligation.findMany(),
@@ -86,7 +86,8 @@ export default async function DashboardPage() {
     prisma.trip.findFirst({ where: { date: { gte: todayZero } }, orderBy: { date: 'asc' } }),
     prisma.timelineEvent.findMany({ where: { date: { gte: todayZero } }, orderBy: { date: 'asc' }, take: 3 }),
     prisma.expense.findMany({ where: { date: { gte: startOfMonth } }, include: { user: true }, orderBy: { date: 'desc' } }),
-    prisma.bucketItem.findMany({ include: { creator: true, approver: true }, orderBy: { createdAt: 'desc' } })
+    prisma.bucketItem.findMany({ include: { creator: true, approver: true }, orderBy: { createdAt: 'desc' } }),
+    prisma.petHealthEvent.findMany({ orderBy: { dueDate: 'asc' } }) // Püppi Health Events hinzugefügt
   ]);
 
   const currentUser = allUsers.find(u => u.email === session.user?.email);
@@ -116,7 +117,7 @@ export default async function DashboardPage() {
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
   const weeklyExpenses = expenses.filter(e => e.date >= sevenDaysAgo).reduce((sum, e) => sum + e.amount, 0);
-  // Wir machen den Count für Chores hier separat, um den Promise.all Block übersichtlich zu halten (ist extrem schnell)
+  
   const choresDoneThisWeek = await prisma.chore.count({ where: { lastDoneAt: { gte: sevenDaysAgo } } });
   
   const daysUntilTrip = nextTrip ? Math.ceil((nextTrip.date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
@@ -130,6 +131,24 @@ export default async function DashboardPage() {
   const litter1Status = getHygieneStatus(lastCleanBox1?.createdAt);
   const litter2Status = getHygieneStatus(lastCleanBox2?.createdAt);
   const overallPueppiStatus = Math.max(foodStatusLevel, litter1Status.level, litter2Status.level);
+
+  // --- ENERGY MATH ---
+  let energyForecast = null;
+  let energyDifference = 0;
+  if (energyReadings.length >= 2) {
+    const firstReading = energyReadings[0];
+    const lastReading = energyReadings[energyReadings.length - 1];
+    const daysDiff = (lastReading.date.getTime() - firstReading.date.getTime()) / (1000 * 3600 * 24);
+    if (daysDiff > 0) {
+      const kwhConsumed = lastReading.value - firstReading.value;
+      const dailyKwh = kwhConsumed / daysDiff;
+      const projectedYearlyCost = (dailyKwh * 365) * energySettings.kwhPrice;
+      const yearlyPrepayments = energySettings.monthlyPrepayment * 12;
+      energyDifference = yearlyPrepayments - projectedYearlyCost; 
+      energyForecast = { projectedYearlyCost, yearlyPrepayments, difference: energyDifference };
+    }
+  }
+  const displayReadings = [...energyReadings].reverse().slice(0, 5);
 
   const apps = [
     { title: "Smart Home", icon: <LayoutDashboard size={24} />, href: "/smarthome", color: "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-500" },
@@ -248,26 +267,55 @@ export default async function DashboardPage() {
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <p className="text-[10px] uppercase font-bold text-stone-500 border-b border-stone-800 pb-2">Monatliche Fixkosten verwalten</p>
-                <div className="space-y-2 max-h-40 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-stone-800">
-                   {obligations.map(ob => (
-                     <div key={ob.id} className="flex justify-between items-center text-[11px] text-stone-400 group">
-                        <span className="truncate max-w-[150px]">{ob.title}</span>
-                        <div className="flex items-center gap-3">
-                           <span className="tabular-nums">€ {ob.amount.toFixed(0)}</span>
-                           <form action={async () => { "use server"; await deleteObligation(ob.id); }}>
-                              <button className="opacity-0 group-hover:opacity-100 text-stone-600 hover:text-rose-500 transition-all"><X size={12}/></button>
-                           </form>
-                        </div>
-                     </div>
-                   ))}
+              {/* FIXKOSTEN & VARIABLE AUSGABEN (ALLTAG) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* FIXKOSTEN */}
+                <div className="space-y-4">
+                  <p className="text-[10px] uppercase font-bold text-stone-500 border-b border-stone-800 pb-2">Monatliche Fixkosten</p>
+                  <div className="space-y-2 max-h-40 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-stone-800">
+                     {obligations.map(ob => (
+                       <div key={ob.id} className="flex justify-between items-center text-[11px] text-stone-400 group">
+                          <span className="truncate max-w-[120px]">{ob.title}</span>
+                          <div className="flex items-center gap-3">
+                             <span className="tabular-nums">€ {ob.amount.toFixed(0)}</span>
+                             <form action={async () => { "use server"; await deleteObligation(ob.id); }}>
+                                <button className="opacity-0 group-hover:opacity-100 text-stone-600 hover:text-rose-500 transition-all"><X size={12}/></button>
+                             </form>
+                          </div>
+                       </div>
+                     ))}
+                  </div>
+                  <form action={async (formData) => { "use server"; await addObligation(formData.get("title") as string, parseFloat(formData.get("amount") as string)); }} className="flex gap-2">
+                     <input name="title" placeholder="Miete, Strom, etc." className="flex-1 bg-stone-800 border-none text-[10px] px-3 py-2 rounded-xl outline-none focus:ring-1 focus:ring-[#C5A38E]" required />
+                     <input name="amount" type="number" step="0.01" placeholder="€" className="w-16 bg-stone-800 border-none text-[10px] px-3 py-2 rounded-xl outline-none focus:ring-1 focus:ring-[#C5A38E]" required />
+                     <button className="bg-[#C5A38E] text-stone-900 px-3 py-2 rounded-xl text-[10px] font-bold hover:bg-[#A38572] transition-colors">+</button>
+                  </form>
                 </div>
-                <form action={async (formData) => { "use server"; await addObligation(formData.get("title") as string, parseFloat(formData.get("amount") as string)); }} className="flex gap-2">
-                   <input name="title" placeholder="Miete, Strom, etc." className="flex-1 bg-stone-800 border-none text-[10px] px-3 py-2 rounded-xl outline-none focus:ring-1 focus:ring-[#C5A38E]" required />
-                   <input name="amount" type="number" step="0.01" placeholder="€" className="w-20 bg-stone-800 border-none text-[10px] px-3 py-2 rounded-xl outline-none focus:ring-1 focus:ring-[#C5A38E]" required />
-                   <button className="bg-[#C5A38E] text-stone-900 px-4 py-2 rounded-xl text-[10px] font-bold hover:bg-[#A38572] transition-colors">+</button>
-                </form>
+
+                {/* VARIABLE AUSGABEN (ALLTAG) EINGEFÜGT */}
+                <div className="space-y-4">
+                  <p className="text-[10px] uppercase font-bold text-stone-500 border-b border-stone-800 pb-2">Alltag (Dieser Monat)</p>
+                  <div className="space-y-2 max-h-40 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-stone-800">
+                     {expenses.slice(0, 10).map(ex => (
+                       <div key={ex.id} className="flex justify-between items-center text-[11px] text-stone-400 group">
+                          <span className="truncate max-w-[120px]">{ex.title} <span className="text-[9px] opacity-50">({ex.user?.name})</span></span>
+                          <div className="flex items-center gap-3">
+                             <span className="tabular-nums">€ {ex.amount.toFixed(0)}</span>
+                             <form action={async () => { "use server"; await deleteExpense(ex.id); }}>
+                                <button className="opacity-0 group-hover:opacity-100 text-stone-600 hover:text-rose-500 transition-all"><X size={12}/></button>
+                             </form>
+                          </div>
+                       </div>
+                     ))}
+                  </div>
+                  <form action={async (formData) => { "use server"; await addExpense(formData.get("title") as string, parseFloat(formData.get("amount") as string)); }} className="flex gap-2">
+                     <input name="title" placeholder="Tanken, Rewe..." className="flex-1 bg-stone-800 border-none text-[10px] px-3 py-2 rounded-xl outline-none focus:ring-1 focus:ring-[#C5A38E]" required />
+                     <input name="amount" type="number" step="0.01" placeholder="€" className="w-16 bg-stone-800 border-none text-[10px] px-3 py-2 rounded-xl outline-none focus:ring-1 focus:ring-[#C5A38E]" required />
+                     <button className="bg-[#C5A38E] text-stone-900 px-3 py-2 rounded-xl text-[10px] font-bold hover:bg-[#A38572] transition-colors">+</button>
+                  </form>
+                </div>
+
               </div>
             </div>
           </div>
@@ -390,7 +438,7 @@ export default async function DashboardPage() {
         {/* OPERATION MODULES GRID */}
         <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           
-          {/* VORRATSSCHRANK NEU */}
+          {/* VORRATSSCHRANK */}
           <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-[2.5rem] p-6 shadow-sm flex flex-col h-[450px] transition-colors">
             <div className="flex items-center gap-2 mb-4">
               <ShoppingCart size={18} className="text-[#C5A38E]" />
@@ -461,8 +509,36 @@ export default async function DashboardPage() {
                   </div>
                 </details>
               </div>
-              <p className="text-xs text-stone-400 italic mb-4">Zählerstände hier eintragen.</p>
+
+              {/* NACHZAHLUNG ODER RÜCKZAHLUNG ANZEIGE */}
+              {energyForecast ? (
+                <div className={`p-3 rounded-2xl mb-4 border ${energyDifference >= 0 ? 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-900/20' : 'bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-900/20'}`}>
+                  <p className="text-[10px] uppercase font-bold tracking-widest opacity-70">Jahresprognose</p>
+                  <p className="text-xl font-light tabular-nums">
+                    {energyDifference >= 0 ? '+' : '-'} € {Math.abs(energyDifference).toFixed(0)}
+                  </p>
+                  <p className="text-[9px] opacity-70 mt-1">Kosten: €{energyForecast.projectedYearlyCost.toFixed(0)} | Bezahlt: €{energyForecast.yearlyPrepayments.toFixed(0)}</p>
+                </div>
+              ) : (
+                 <p className="text-xs text-stone-400 italic mb-4">Mindestens 2 Zählerstände für Prognose benötigt.</p>
+              )}
+
+              <div className="space-y-2">
+                {displayReadings.map(r => (
+                  <div key={r.id} className="flex justify-between items-center text-sm border-b border-stone-100 dark:border-stone-800 pb-1 group">
+                    <span className="text-stone-500 text-[10px]">{new Date(r.date).toLocaleDateString('de-DE', { month: 'short', day: '2-digit' })}</span>
+                    <span className="font-bold tabular-nums text-xs">{r.value} kWh</span>
+                    <form action={async () => { "use server"; await deleteEnergyReading(r.id); }}>
+                      <button className="opacity-0 group-hover:opacity-100 text-stone-400 hover:text-rose-500 transition-opacity"><Trash2 size={10}/></button>
+                    </form>
+                  </div>
+                ))}
+              </div>
             </div>
+            <form action={async (formData) => { "use server"; await addEnergyReading("STROM", parseFloat(formData.get("val") as string)); }} className="mt-4 flex gap-2">
+              <input name="val" type="number" step="0.1" placeholder="Neuer Zählerstand..." className="flex-1 h-10 bg-stone-50 dark:bg-stone-950 px-3 rounded-xl text-xs outline-none" required />
+              <button className="px-3 h-10 bg-amber-500 text-white rounded-xl text-xs font-bold">+</button>
+            </form>
           </div>
 
           {/* SHARED CONTACTS */}
@@ -550,7 +626,7 @@ export default async function DashboardPage() {
             </form>
           </div>
 
-          {/* PÜPPI CARES */}
+          {/* PÜPPI CARES (Mit Health Events) */}
           <div className="bg-stone-900 text-white rounded-[2.5rem] p-8 shadow-2xl flex flex-col justify-between overflow-hidden relative transition-colors duration-500" 
                style={{ boxShadow: overallPueppiStatus === 3 ? '0 0 40px -5px rgba(239, 68, 68, 0.3)' : overallPueppiStatus === 2 ? '0 0 30px -5px rgba(245, 158, 11, 0.2)' : '0 10px 30px -10px rgba(0,0,0,0.5)' }}>
             
@@ -571,7 +647,7 @@ export default async function DashboardPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 mb-8 relative z-10">
+            <div className="grid grid-cols-2 gap-3 mb-6 relative z-10">
               <div className={`p-4 rounded-2xl border transition-colors ${getHygieneStatus(lastCleanBox1?.createdAt).bg}`}>
                 <div className="flex justify-between items-center mb-1.5">
                     <span className="text-xs font-bold uppercase tracking-wider text-stone-700 dark:text-stone-300">Haupt-Klo</span>
@@ -592,6 +668,28 @@ export default async function DashboardPage() {
               </div>
             </div>
 
+            {/* NEU: HEALTH EVENTS */}
+            <div className="bg-stone-800/50 rounded-2xl p-4 mb-6 relative z-10 border border-stone-700/50">
+              <p className="text-[10px] uppercase font-bold text-stone-500 mb-2">Gesundheit & Termine</p>
+              <div className="space-y-2 mb-3">
+                {healthEvents.length === 0 && <p className="text-[10px] text-stone-500 italic">Keine anstehenden Termine.</p>}
+                {healthEvents.map(he => (
+                  <div key={he.id} className="flex justify-between items-center text-xs group">
+                    <span className="font-bold text-stone-300">{he.title}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-[#C5A38E]">{he.dueDate.toLocaleDateString('de-DE')}</span>
+                      <form action={async () => { "use server"; await deleteHealthEvent(he.id); }}><button className="opacity-0 group-hover:opacity-100 text-rose-500"><Trash2 size={10}/></button></form>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <form action={async (formData) => { "use server"; await addHealthEvent(formData.get("title") as string, formData.get("date") as string); }} className="flex gap-2">
+                <input name="title" placeholder="Impfung, Tierarzt..." className="flex-1 bg-stone-900 px-3 py-2 rounded-xl text-[10px] outline-none border border-transparent focus:border-[#C5A38E]" required />
+                <input name="date" type="date" className="w-24 bg-stone-900 px-3 py-2 rounded-xl text-[10px] outline-none border border-transparent focus:border-[#C5A38E]" required />
+                <button className="bg-white/10 hover:bg-white/20 text-white px-3 rounded-xl text-[10px] transition-colors">+</button>
+              </form>
+            </div>
+
             <div className="flex gap-2 relative z-10">
               <form action={consumePetFood} className="flex-1"><button className="w-full h-12 bg-stone-800/80 rounded-2xl text-xs font-bold hover:bg-rose-500/20 hover:text-rose-500 transition-colors duration-300">-1 Dose</button></form>
               <form action={async () => { "use server"; await addPetFood(6); }} className="flex-1"><button className="w-full h-12 bg-[#C5A38E] text-stone-900 rounded-2xl text-xs font-bold hover:bg-[#A38572] transition-colors duration-300">+6 Dosen</button></form>
@@ -610,7 +708,14 @@ export default async function DashboardPage() {
         }} className="w-full max-w-md bg-white/95 dark:bg-stone-900/95 backdrop-blur-xl p-4 rounded-[2.5rem] shadow-2xl border border-stone-200/50 pointer-events-auto flex flex-col gap-3 transition-colors duration-500">
           <div className="flex gap-2">
             <input name="title" placeholder="Wunsch hinzufügen..." className="flex-1 h-12 bg-stone-100/50 dark:bg-black/20 px-5 rounded-2xl outline-none text-sm focus:border-[#C5A38E] border border-transparent transition" required />
-            <input name="price" type="number" placeholder="€" className="w-20 h-12 bg-stone-100/50 dark:bg-black/20 rounded-2xl outline-none text-center text-sm focus:border-[#C5A38E] border border-transparent transition" />
+            <input name="price" type="number" placeholder="€" className="w-16 h-12 bg-stone-100/50 dark:bg-black/20 rounded-2xl outline-none text-center text-sm focus:border-[#C5A38E] border border-transparent transition" />
+            
+            {/* SURPRISE CHECKBOX */}
+            <label className="flex flex-col items-center justify-center w-12 h-12 bg-stone-100/50 dark:bg-black/20 rounded-2xl cursor-pointer hover:bg-black/30 transition-colors">
+              <input type="checkbox" name="isSurprise" className="w-4 h-4 accent-[#C5A38E]" />
+              <span className="text-[8px] uppercase mt-1 text-stone-500 font-bold">Geheim</span>
+            </label>
+
             <button className="w-12 h-12 bg-[#C5A38E] text-white rounded-2xl shadow-md flex items-center justify-center hover:bg-[#A38572] transition-colors"><Plus size={24}/></button>
           </div>
         </form>

@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Tailwind v4: Das sagt dem System, dass der Dark Mode per Button (.dark Klasse) gesteuert wird */
+/* Tailwind v4: Dark Mode Steuerung */
 @variant dark (&:where(.dark, .dark *));
 
 :root {
@@ -8,7 +8,6 @@
   --foreground: #171717;
 }
 
-/* Anstatt eines automatischen Wechsels nutzen wir jetzt die .dark Klasse */
 .dark {
   --background: #0a0a0a;
   --foreground: #ededed;
@@ -18,4 +17,37 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  /* Verhindert das Scrollen auf dem Body-Level für den App-Look */
+  overflow: hidden; 
+}
+
+/* --- HÖHLE HQ CUSTOM TERMINAL STYLES --- */
+
+/* Sanftes Einblenden beim Start der App */
+@keyframes terminalFadeIn {
+  from { 
+    opacity: 0; 
+    transform: translateY(8px); 
+    filter: blur(4px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0); 
+    filter: blur(0); 
+  }
+}
+
+/* Diese Klasse hängst du in deinem Layout oder Page-File an den Haupt-Container */
+.dashboard-fade {
+  animation: terminalFadeIn 0.8s ease-out forwards;
+}
+
+/* Scrollbars systemweit für den Kiosk-Look verstecken */
+::-webkit-scrollbar {
+  display: none;
+}
+
+* {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }

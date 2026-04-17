@@ -20,7 +20,7 @@ import {
   Map, Heart, Lock, BookOpen, Calendar,
   Cat, CheckCircle2, TrendingUp, PiggyBank, ClipboardList,
   Plus, X, Check, Camera, MessageSquare, Zap, Phone, Timer, Star,
-  Trash2, ThumbsUp, ChevronDown, Settings, Maximize2, Clock, AlertTriangle, PieChart, Wifi 
+  Trash2, ThumbsUp, ChevronDown, Settings, Maximize2, Clock, AlertTriangle, PieChart
 } from "lucide-react";
 
 function getHygieneStatus(lastCleanAt?: Date | null) {
@@ -64,7 +64,6 @@ export default async function DashboardPage() {
   const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   const todayZero = new Date(new Date().setHours(0,0,0,0));
   
-  // HARTER SYSTEM-START: 01. Mai 2026
   const systemStartDate = new Date("2026-05-01T00:00:00.000Z");
 
   const [
@@ -91,7 +90,6 @@ export default async function DashboardPage() {
     prisma.bucketItem.findMany({ include: { creator: true, approver: true }, orderBy: { createdAt: 'desc' } }),
     prisma.petHealthEvent.findMany({ orderBy: { dueDate: 'asc' } }),
     
-    // Für den All-Time Kontostand ignorieren wir alles vor Mai 2026!
     prisma.expense.aggregate({ where: { date: { gte: systemStartDate } }, _sum: { amount: true } }),
     prisma.income.aggregate({ where: { date: { gte: systemStartDate } }, _sum: { amount: true } }),
     prisma.trip.aggregate({ _sum: { savedAmount: true } }),
@@ -104,13 +102,11 @@ export default async function DashboardPage() {
   let petFood = petFoodResult || await prisma.petFood.create({ data: { cans: 10 } });
   let energySettings = energySettingsResult || await prisma.energySettings.create({ data: { kwhPrice: 0.35, monthlyPrepayment: 80 } });
 
-  // --- DIE ECHTE KONTOSTAND-MATHE (Ab Mai 2026) ---
   const startYear = 2026;
-  const startMonth = 4; // Mai (0-indexed = 4)
+  const startMonth = 4; // Mai
   const now = new Date();
   
   let monthsActive = (now.getFullYear() - startYear) * 12 + (now.getMonth() - startMonth) + 1;
-  // Wenn wir aktuell noch vor Mai sind (z.B. April), werden noch 0 Monate Fixkosten berechnet
   if (monthsActive < 0) monthsActive = 0; 
 
   const totalFixedMonthly = obligations.reduce((sum, ob) => sum + ob.amount, 0);
@@ -395,7 +391,7 @@ export default async function DashboardPage() {
                       <option value="Allgemein">Allg.</option>
                     </select>
                     <input name="amount" type="number" step="0.01" placeholder="€" className="flex-1 bg-stone-800 border-none text-[10px] px-3 py-2.5 rounded-xl outline-none focus:ring-1 focus:ring-[#C5A38E]" required />
-                    <button className="bg-[#C5A38E] text-stone-900 px-3 py-2.5 rounded-xl text-[10px] font-bold hover:bg-[#A38572] transition-colors">+</button>
+                    <button className="bg-[#C5A38E] text-stone-900 px-4 py-2.5 rounded-xl text-[10px] font-bold hover:bg-[#A38572] transition-colors">+</button>
                   </div>
               </form>
             </div>
@@ -422,17 +418,17 @@ export default async function DashboardPage() {
                   </div>
                   <div className="flex justify-between items-end mb-2">
                     <span className="text-xs font-medium text-stone-500">€ {item.savedAmount} / {item.price}</span>
-                    <span className="text-xs font-bold text-[#C5A38E]">{Math.round((item.savedAmount / item.price) * 100)}%</span>
+                    <span className="text-xs font-bold text-[#C5A38E]">{item.price > 0 ? Math.round((item.savedAmount / item.price) * 100) : 0}%</span>
                   </div>
                   <div className="h-1.5 w-full bg-stone-200 dark:bg-stone-800 rounded-full overflow-hidden mb-4">
-                    <div className="bg-[#C5A38E] h-full rounded-full transition-all duration-500" style={{ width: `${Math.min((item.savedAmount / item.price) * 100, 100)}%` }} />
+                    <div className="bg-[#C5A38E] h-full rounded-full transition-all duration-500" style={{ width: `${item.price > 0 ? Math.min((item.savedAmount / item.price) * 100, 100) : 0}%` }} />
                   </div>
                   <div className="flex gap-2">
                     <form action={async (formData) => { "use server"; await addFundsToItem(item.id, parseFloat(formData.get("amount") as string)); }} className="flex-1 flex gap-1">
                       <input name="amount" type="number" placeholder="+ €" className="w-16 h-8 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 rounded-lg text-xs text-center outline-none" required />
                       <button className="flex-1 bg-stone-900 dark:bg-stone-800 text-white rounded-lg text-xs font-bold shadow-sm">Save</button>
                     </form>
-                    {item.savedAmount >= item.price && (
+                    {item.savedAmount >= item.price && item.price > 0 && (
                       <form action={async () => { "use server"; await markItemCompleted(item.id); }}>
                         <button className="h-8 px-3 bg-emerald-500 text-white rounded-lg text-xs font-bold shadow-sm flex items-center"><Check size={14} /></button>
                       </form>
@@ -454,11 +450,22 @@ export default async function DashboardPage() {
                     </form>
                   </div>
                   <div className="flex justify-between items-end mb-2">
-                    <span className="text-xs font-medium text-stone-500">Wartet auf Freigabe</span>
-                    <span className="text-xs font-bold text-stone-400">€ {item.price}</span>
+                    <span className="text-xs font-medium text-stone-500">€ {item.savedAmount} / {item.price}</span>
+                    <span className="text-xs font-bold text-[#C5A38E]">{item.price > 0 ? Math.round((item.savedAmount / item.price) * 100) : 0}%</span>
                   </div>
-                  <div className="text-[10px] text-amber-600 dark:text-amber-500 flex items-center gap-1 mt-2">
-                    <Timer size={12} /> Partner muss noch zustimmen
+                  <div className="h-1.5 w-full bg-stone-200 dark:bg-stone-800 rounded-full overflow-hidden mb-4">
+                    <div className="bg-[#C5A38E] h-full rounded-full transition-all duration-500" style={{ width: `${item.price > 0 ? Math.min((item.savedAmount / item.price) * 100, 100) : 0}%` }} />
+                  </div>
+                  <div className="flex gap-2">
+                    <form action={async (formData) => { "use server"; await addFundsToItem(item.id, parseFloat(formData.get("amount") as string)); }} className="flex-1 flex gap-1">
+                      <input name="amount" type="number" placeholder="+ €" className="w-16 h-8 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 rounded-lg text-xs text-center outline-none" required />
+                      <button className="flex-1 bg-stone-900 dark:bg-stone-800 text-white rounded-lg text-xs font-bold shadow-sm">Save</button>
+                    </form>
+                    {item.savedAmount >= item.price && item.price > 0 && (
+                      <form action={async () => { "use server"; await markItemCompleted(item.id); }}>
+                        <button className="h-8 px-3 bg-emerald-500 text-white rounded-lg text-xs font-bold shadow-sm flex items-center"><Check size={14} /></button>
+                      </form>
+                    )}
                   </div>
                 </div>
               ))}
@@ -468,20 +475,18 @@ export default async function DashboardPage() {
               <h3 className="text-[10px] font-bold text-stone-500 uppercase tracking-widest border-b border-stone-100 dark:border-stone-800 pb-2">Wünsche von Partner</h3>
               {partnerIndividualItems.length === 0 && <p className="text-xs text-stone-400 italic">Keine Wünsche ausstehend.</p>}
               {partnerIndividualItems.map(item => (
-                <div key={item.id} className="bg-[#C5A38E]/10 border border-[#C5A38E]/20 p-4 rounded-2xl">
+                <div key={item.id} className="bg-[#C5A38E]/5 border border-[#C5A38E]/20 p-4 rounded-2xl">
                   <div className="flex justify-between items-start mb-2">
                     <span className="font-bold text-sm leading-tight text-stone-800 dark:text-stone-200">{item.title}</span>
                     <span className="text-xs font-bold text-[#C5A38E]">€ {item.price}</span>
                   </div>
+                  <div className="flex justify-between items-end mb-2 mt-2">
+                    <span className="text-xs font-medium text-stone-500">Bereits gespart: € {item.savedAmount}</span>
+                  </div>
                   <div className="flex gap-2 mt-3">
                     <form action={async () => { "use server"; await approveBucketItem(item.id); }} className="flex-1">
-                      <button className="w-full h-8 bg-[#C5A38E] text-white rounded-lg text-xs font-bold shadow-sm flex items-center justify-center gap-1">
-                        <ThumbsUp size={12} /> Zustimmen
-                      </button>
-                    </form>
-                    <form action={async () => { "use server"; await deleteBucketItem(item.id); }}>
-                      <button className="w-8 h-8 bg-white dark:bg-stone-900 border text-stone-400 hover:text-rose-500 rounded-lg flex items-center justify-center">
-                        <X size={14} />
+                      <button className="w-full h-8 bg-[#C5A38E] text-white rounded-lg text-xs font-bold shadow-sm flex items-center justify-center gap-1 hover:bg-[#A38572] transition-colors">
+                        <ThumbsUp size={12} /> Zu gemeinsamem Wunsch machen
                       </button>
                     </form>
                   </div>

@@ -42,7 +42,7 @@ export default function GuestsPage() {
         {/* HERO SECTION */}
         <div className="text-center py-8">
           <h2 className="text-4xl md:text-5xl font-light mb-4" style={{ fontFamily: "'Cormorant Garamond', serif" }}>Schön, dass du da bist.</h2>
-          <p className="text-stone-500 dark:text-stone-400 max-w-lg mx-auto">Mach es dir bequem! Hier findest du alle wichtigen Infos für deinen Aufenthalt in der Höhle HQ.</p>
+          <p className="text-stone-500 dark:text-stone-400 max-w-lg mx-auto">Mach es dir bequem! Hier findest du alle wichtigen Infos für deinen Aufenthalt in der Höhle.</p>
         </div>
 
         {/* GUEST BENTO GRID */}
@@ -83,11 +83,11 @@ export default function GuestsPage() {
               <ul className="space-y-4 relative z-10 text-sm text-stone-300">
                 <li className="flex items-start gap-2">
                   <span className="text-[#C5A38E] mt-0.5">•</span>
-                  <span>Bitte Püppi <strong className="text-white">kein Essen vom Tisch</strong> geben, egal wie süß sie schaut.</span>
+                  <span>Gerne füttern. <strong className="text-white">Schleckis</strong> mag ich fast am liebsten.</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-[#C5A38E] mt-0.5">•</span>
-                  <span>Schlafzimmertür bitte immer geschlossen halten.</span>
+                  <span>Fenster geschlossen halten</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-[#C5A38E] mt-0.5">•</span>
@@ -106,12 +106,12 @@ export default function GuestsPage() {
                 <div className="bg-stone-50 dark:bg-stone-950 p-4 rounded-2xl flex flex-col items-center text-center gap-2 border border-stone-100 dark:border-stone-800">
                   <Coffee size={20} className="text-stone-400" />
                   <span className="font-medium">Getränke</span>
-                  <span className="text-[10px] text-stone-500">Bedien dich einfach am Kühlschrank!</span>
+                  <span className="text-[10px] text-stone-500">Nimm dir was du brauchst.</span>
                 </div>
                 <div className="bg-stone-50 dark:bg-stone-950 p-4 rounded-2xl flex flex-col items-center text-center gap-2 border border-stone-100 dark:border-stone-800">
                   <Home size={20} className="text-stone-400" />
                   <span className="font-medium">Schuhe</span>
-                  <span className="text-[10px] text-stone-500">Wir sind ein schuhfreier Haushalt.</span>
+                  <span className="text-[10px] text-stone-500">Wir versuchen, Schuhfrei zu sein.</span>
                 </div>
               </div>
             </div>

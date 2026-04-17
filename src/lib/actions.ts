@@ -259,12 +259,11 @@ export async function markDateUsed(id: string) {
   revalidatePath("/roulette");
 }
 
-// --- MEAL PREP 2.0 (Intelligenter Abgleich mit Vorrat) ---
+// --- MEAL PREP 2.0 ---
 export async function addMealPlan(dayOfWeek: number, mealType: string, recipeInput: string, ingredientsInput: string, recipeNotes: string = "", recipeId?: string) {
   await requireAuth();
   
   if (recipeId) {
-    // 1. Es wurde ein Rezept aus dem Kochbuch gewählt!
     const recipe = await prisma.recipe.findUnique({ where: { id: recipeId }, include: { ingredients: true } });
     if (recipe) {
       await prisma.mealPlan.create({
@@ -278,7 +277,6 @@ export async function addMealPlan(dayOfWeek: number, mealType: string, recipeInp
         }
       });
 
-      // 2. Smart Check: Gibt es die Zutaten im Vorrat?
       for (const ing of recipe.ingredients) {
         const pantryItem = await prisma.pantryItem.findFirst({ where: { name: { equals: ing.name, mode: 'insensitive' } } });
         let missingAmount = ing.amount;
@@ -286,12 +284,11 @@ export async function addMealPlan(dayOfWeek: number, mealType: string, recipeInp
         
         if (pantryItem) {
            pItemId = pantryItem.id;
-           if (pantryItem.count >= ing.amount) missingAmount = 0; // Wir haben genug!
-           else missingAmount = ing.amount - pantryItem.count; // Nur die Differenz einkaufen
+           if (pantryItem.count >= ing.amount) missingAmount = 0; 
+           else missingAmount = ing.amount - pantryItem.count; 
         }
         
         if (missingAmount > 0) {
-           // Ab auf die Einkaufsliste damit!
            const existingShopItem = await prisma.shoppingItem.findFirst({ where: { title: { contains: ing.name, mode: 'insensitive' }, checked: false } });
            if (!existingShopItem) {
               await prisma.shoppingItem.create({ data: { title: `${ing.name} (für ${recipe.title})`, amount: missingAmount, unit: ing.unit, pantryItemId: pItemId } });
@@ -302,7 +299,6 @@ export async function addMealPlan(dayOfWeek: number, mealType: string, recipeInp
       }
     }
   } else {
-    // 3. Fallback: Manuelle Eingabe (Wie bisher)
     const ingredients = ingredientsInput.split(',').map(i => i.trim()).filter(i => i.length > 0);
     await prisma.mealPlan.create({
       data: { dayOfWeek, mealType, recipe: recipeInput, ingredients, recipeNotes }
@@ -318,7 +314,6 @@ export async function markMealCooked(mealId: string) {
   const meal = await prisma.mealPlan.findUnique({ where: { id: mealId } });
   if (!meal || meal.isCooked) return;
 
-  // Wenn es ein Rezept aus dem Kochbuch war, buchen wir die Zutaten automatisch aus dem Vorrat ab!
   if (meal.recipeId) {
     const recipe = await prisma.recipe.findUnique({ where: { id: meal.recipeId }, include: { ingredients: true } });
     if (recipe) {
@@ -328,7 +323,6 @@ export async function markMealCooked(mealId: string) {
           const newCount = Math.max(0, pantryItem.count - ing.amount);
           await prisma.pantryItem.update({ where: { id: pantryItem.id }, data: { count: newCount } });
           
-          // Fällt der Bestand unter Minimum? Ab auf die Einkaufsliste!
           if (newCount < pantryItem.minCount) {
             const existingShop = await prisma.shoppingItem.findFirst({ where: { pantryItemId: pantryItem.id, checked: false } });
             if (!existingShop) {
@@ -342,22 +336,17 @@ export async function markMealCooked(mealId: string) {
 
   await prisma.mealPlan.update({ where: { id: mealId }, data: { isCooked: true } });
   revalidatePath("/mealprep");
-  revalidatePath("/"); // Update Vorrat auf dem Dashboard
+  revalidatePath("/");
 }
 
-export async function addRecipe(title: string, instructions: string, ingredientsText: string) {
+// NEU: Erwartet jetzt einen JSON String, der fehlerfrei geparst wird!
+export async function addRecipe(title: string, instructions: string, ingredientsJson: string) {
   await requireAuth();
-  const lines = ingredientsText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-  
-  // CLEVER PARSER: Liest Formate wie "500 Gramm Hackfleisch" automatisch aus
-  const parsedIngredients = lines.map(line => {
-     const match = line.match(/^([\d.,]+)\s*([a-zA-ZäöüÄÖÜß]+)\s+(.+)$/i);
-     if (match) {
-        const amount = parseFloat(match[1].replace(',', '.'));
-        return { amount: isNaN(amount) ? 1 : amount, unit: match[2], name: match[3].trim() };
-     }
-     return { amount: 1, unit: "Stück", name: line }; // Fallback
-  });
+  const parsedIngredients = JSON.parse(ingredientsJson).map((ing: any) => ({
+     amount: parseFloat(ing.amount) || 1,
+     unit: ing.unit || "Stück",
+     name: ing.name
+  }));
 
   await prisma.recipe.create({
     data: {
@@ -374,7 +363,6 @@ export async function deleteRecipe(id: string) {
   await prisma.recipe.delete({ where: { id } });
   revalidatePath("/mealprep");
 }
-// ---------------------------------------------------------
 
 export async function deleteMealPlan(id: string) {
   await requireAuth();

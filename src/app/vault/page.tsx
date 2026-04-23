@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { addVaultItem, deleteVaultItem } from "@/lib/actions";
 import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
+import SubmitButton from "@/components/SubmitButton"; // NEU
 import { FileDown, Link as LinkIcon, Lock, Trash2, Upload } from "lucide-react";
 
 export default async function VaultPage() {
@@ -37,7 +38,6 @@ export default async function VaultPage() {
               items.map(item => (
                 <div key={item.id} className="flex justify-between items-center p-4 bg-stone-800/50 rounded-2xl border border-stone-700">
                   <div className="flex-1">
-                    {/* ENTWEDER EIN LOKALER DATEI-DOWNLOAD ODER EIN EXTERNER LINK */}
                     {item.fileData ? (
                       <a href={item.fileData} download={item.title} className="font-bold text-emerald-400 hover:text-emerald-300 transition flex items-center gap-2">
                         <FileDown size={16} /> {item.title}
@@ -50,7 +50,7 @@ export default async function VaultPage() {
                     <p className="text-[10px] text-stone-400 mt-1">Hinzugefügt von {item.addedBy} am {item.createdAt.toLocaleDateString()}</p>
                   </div>
                   <form action={async () => { "use server"; await deleteVaultItem(item.id); }}>
-                    <button className="text-stone-500 hover:text-red-400 text-sm p-2 transition-colors"><Trash2 size={16}/></button>
+                    <SubmitButton isIconOnly className="text-stone-500 hover:text-red-400 text-sm p-2 transition-colors"><Trash2 size={16}/></SubmitButton>
                   </form>
                 </div>
               ))
@@ -75,7 +75,7 @@ export default async function VaultPage() {
                </div>
             </div>
 
-            <button type="submit" className="bg-[#C5A38E] text-white px-6 py-3 mt-2 rounded-xl font-bold hover:bg-[#A38572] transition-colors w-full">In den Tresor legen</button>
+            <SubmitButton className="bg-[#C5A38E] text-white px-6 py-3 mt-2 rounded-xl font-bold hover:bg-[#A38572] transition-colors w-full">In den Tresor legen</SubmitButton>
           </form>
         </section>
 

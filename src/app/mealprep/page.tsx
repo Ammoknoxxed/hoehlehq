@@ -7,6 +7,7 @@ import { addMealPlan, deleteMealPlan, syncIngredientsToShoppingList, deleteRecip
 import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
 import RecipeForm from "@/components/RecipeForm";
+import SubmitButton from "@/components/SubmitButton"; // NEU
 import { Trash2, Utensils, BookOpen, CheckCircle, ChevronRight, PlusCircle, Sparkles, ShoppingCart } from "lucide-react";
 
 const DAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
@@ -22,7 +23,6 @@ export default async function MealPrepPage() {
     <div className="min-h-screen bg-[#F9F7F5] dark:bg-stone-950 text-stone-900 dark:text-stone-100 p-4 md:p-8 transition-colors duration-300">
       <div className="max-w-6xl mx-auto space-y-8 pb-20">
         
-        {/* HEADER */}
         <header className="flex items-center justify-between pb-6 border-b border-stone-200 dark:border-stone-800">
           <div className="flex items-center gap-4">
             <Link href="/" className="w-10 h-10 flex items-center justify-center rounded-full bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 transition shadow-sm">
@@ -35,13 +35,10 @@ export default async function MealPrepPage() {
           <ThemeToggle />
         </header>
 
-        {/* 2-SPALTEN LAYOUT */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
-          {/* LINKE SPALTE: WOCHENPLAN (2/3 Breite) */}
           <div className="lg:col-span-7 xl:col-span-8 space-y-6">
             
-            {/* NEUES GERICHT HINZUFÜGEN */}
             <div className="bg-white dark:bg-stone-900 p-6 md:p-8 rounded-[2.5rem] shadow-sm border border-stone-200 dark:border-stone-800 relative overflow-hidden transition-colors">
                <div className="absolute -right-4 -top-4 opacity-[0.03] text-[#C5A38E] pointer-events-none"><Utensils size={120} /></div>
                <h2 className="text-xs font-bold uppercase tracking-widest text-stone-400 mb-6 flex items-center gap-2">
@@ -93,13 +90,12 @@ export default async function MealPrepPage() {
                    <input name="manualIngredients" placeholder="Zutaten (kommagetrennt)" className="w-full bg-stone-50 dark:bg-stone-950 px-4 py-3 rounded-2xl text-sm outline-none focus:ring-1 focus:ring-[#C5A38E] border border-stone-100 dark:border-stone-800 transition-colors" />
                  </div>
 
-                 <button type="submit" className="w-full bg-[#C5A38E] text-white font-bold py-4 rounded-2xl hover:bg-[#A38572] transition shadow-md">
+                 <SubmitButton className="w-full bg-[#C5A38E] text-white font-bold py-4 rounded-2xl hover:bg-[#A38572] transition shadow-md">
                    In den Plan eintragen
-                 </button>
+                 </SubmitButton>
                </form>
             </div>
 
-            {/* DIE TAGE (BENTO GRID) */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {DAYS.map((day, index) => {
                 const dayMeals = meals.filter(m => m.dayOfWeek === index);
@@ -120,11 +116,11 @@ export default async function MealPrepPage() {
                             <div className="flex items-center gap-1">
                               {!meal.isCooked && !meal.recipeId && (
                                 <form action={async () => { "use server"; await syncIngredientsToShoppingList(meal.id); }}>
-                                  <button title="Zutaten einkaufen" className="text-stone-400 hover:text-blue-500 w-6 h-6 rounded-full flex items-center justify-center transition-colors"><ShoppingCart size={12}/></button>
+                                  <SubmitButton isIconOnly title="Zutaten einkaufen" className="text-stone-400 hover:text-blue-500 w-6 h-6 rounded-full flex items-center justify-center transition-colors"><ShoppingCart size={12}/></SubmitButton>
                                 </form>
                               )}
                               <form action={async () => { "use server"; await deleteMealPlan(meal.id); }}>
-                                <button className="text-stone-400 hover:text-rose-500 w-6 h-6 rounded-full flex items-center justify-center transition-colors"><Trash2 size={12}/></button>
+                                <SubmitButton isIconOnly className="text-stone-400 hover:text-rose-500 w-6 h-6 rounded-full flex items-center justify-center transition-colors"><Trash2 size={12}/></SubmitButton>
                               </form>
                             </div>
                           </div>
@@ -137,9 +133,9 @@ export default async function MealPrepPage() {
 
                           {!meal.isCooked && meal.recipeId && (
                             <form action={async () => { "use server"; await markMealCooked(meal.id); }}>
-                              <button className="w-full flex items-center justify-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-bold py-2 rounded-xl transition-colors shadow-sm">
+                              <SubmitButton className="w-full flex items-center justify-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-bold py-2 rounded-xl transition-colors shadow-sm">
                                 <CheckCircle size={12} /> Gekocht (Vorrat anpassen)
-                              </button>
+                              </SubmitButton>
                             </form>
                           )}
                           
@@ -159,7 +155,6 @@ export default async function MealPrepPage() {
 
           </div>
 
-          {/* RECHTE SPALTE: KOCHBUCH (1/3 Breite) */}
           <div className="lg:col-span-5 xl:col-span-4 space-y-6">
             
             <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 p-6 md:p-8 rounded-[2.5rem] shadow-sm flex flex-col transition-colors">
@@ -168,7 +163,6 @@ export default async function MealPrepPage() {
                  <h2 className="text-lg font-bold">Das Kochbuch</h2>
               </div>
 
-              {/* LISTE DER REZEPTE */}
               <div className="flex-1 overflow-y-auto pr-2 space-y-2 max-h-[40vh] scrollbar-thin scrollbar-thumb-stone-200 dark:scrollbar-thumb-stone-800">
                 {recipes.length === 0 && <p className="text-xs text-stone-500 italic text-center py-8">Noch keine Rezepte gespeichert.</p>}
                 {recipes.map(recipe => (
@@ -188,7 +182,7 @@ export default async function MealPrepPage() {
                          ))}
                        </ul>
                        <form action={async () => { "use server"; await deleteRecipe(recipe.id); }} className="flex justify-end mt-4">
-                         <button className="text-[10px] text-rose-400 hover:text-rose-500 font-bold flex items-center gap-1 transition-colors"><Trash2 size={12}/> Rezept löschen</button>
+                         <SubmitButton isIconOnly className="text-[10px] text-rose-400 hover:text-rose-500 font-bold flex items-center gap-1 transition-colors"><Trash2 size={12}/> Rezept löschen</SubmitButton>
                        </form>
                     </div>
                   </details>
@@ -196,7 +190,6 @@ export default async function MealPrepPage() {
               </div>
             </div>
 
-            {/* DIE NEUE CLIENT COMPONENT FÜR DIE ZUTATEN */}
             <RecipeForm />
 
           </div>

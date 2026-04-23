@@ -16,20 +16,31 @@ async function requireAuth() {
   return { session, user };
 }
 
-export async function uploadImage(formData: FormData) {
-  await requireAuth();
-  const file = formData.get("file") as File;
-  if (!file) throw new Error("Kein Bild gefunden");
-
+// --- NEUE HILFSFUNKTION FÜR SICHERE DATEI-UPLOADS ---
+async function uploadFileToDisk(file: File): Promise<string> {
   const bytes = await file.arrayBuffer();
   const buffer = Buffer.from(bytes);
-  const filename = `${Date.now()}-${file.name.replace(/\s/g, '_')}`;
-  const uploadDir = join(process.cwd(), "public/uploads");
+  // Entfernt Sonderzeichen und Leerzeichen für sichere URLs
+  const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+  const filename = `${Date.now()}-${safeName}`;
+  
+  // Neuer sicherer Pfad im Root-Verzeichnis
+  const uploadDir = join(process.cwd(), "data", "uploads");
   const filepath = join(uploadDir, filename);
   
   await mkdir(uploadDir, { recursive: true });
   await writeFile(filepath, buffer);
-  return `/uploads/${filename}`;
+  
+  // Gibt den Pfad zur neuen API-Route zurück
+  return `/api/uploads/${filename}`;
+}
+
+export async function uploadImage(formData: FormData) {
+  await requireAuth();
+  const file = formData.get("file") as File;
+  if (!file) throw new Error("Kein Bild gefunden");
+  
+  return await uploadFileToDisk(file);
 }
 
 export async function updateNetIncome(amount: number) {
@@ -413,11 +424,8 @@ export async function addVaultItem(formData: FormData) {
   let fileType = null;
 
   if (file && file.size > 0) {
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    const base64 = buffer.toString('base64');
+    fileData = await uploadFileToDisk(file);
     fileType = file.type;
-    fileData = `data:${file.type};base64,${base64}`;
   }
 
   if (!url && !fileData) return;
@@ -638,10 +646,7 @@ export async function addStickyNote(formData: FormData) {
   let imageUrl = null;
 
   if (file && file.size > 0) {
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    const base64 = buffer.toString('base64');
-    imageUrl = `data:${file.type};base64,${base64}`;
+    imageUrl = await uploadFileToDisk(file);
   }
 
   if (!text && !imageUrl) return;
